@@ -1,0 +1,237 @@
+brain:
+  name: Brain
+  wake_word: hey brain
+  language: en
+  idle_timeout_seconds: 60
+  thermal_throttle_temp: 75
+  data_dir: data
+  assets_dir: assets
+  log_level: INFO
+  log_file: data/brain.log
+  pulse_hz: 10
+llm:
+  cloud_model: gemini-robotics-er-1.6-preview
+  er_enabled: false
+  google_ai_enabled: false
+  ollama_enabled: false
+  ollama_host: http://localhost:11434
+  default_model: gemma4
+  balanced_model: gemma4
+  embed_model: nomic-embed-text
+  openrouter_enabled: true
+  openrouter_api_key: YOUR_OPENROUTER_API_KEY
+  openrouter_model: google/gemma-4-31b-it:free
+  ollama_cloud_enabled: false
+  ollama_cloud_api_key: YOUR_OLLAMA_CLOUD_API_KEY
+  ollama_cloud_model: minimax-m3:cloud
+  simple_token_threshold: 150
+  complex_token_threshold: 800
+  cache_similarity_threshold: 0.92
+  max_retries: 3
+  timeout_seconds: 30
+  thinking_enabled: true
+memory:
+  working_ttl_seconds: 600
+  sensory_ttl_seconds: 3
+  episodic_db: data/episodes.db
+  semantic_db: data/chroma
+  episodic_retention_days: 7
+  soul_file: data/SOUL.md
+  user_file: data/USER.md
+  user_json_file: data/USER.json
+  world_file: data/WORLD.md
+  skills_file: data/SKILLS.json
+  dream_journal: data/DREAM_LOG.md
+  restore_on_startup: true
+  restore_exchanges: 6
+  world_snapshot: data/world_snapshot.json
+display:
+  enabled: false
+  type: st7789
+  width: 240
+  height: 320
+  spi_device: 0
+  spi_port: 0
+  dc_pin: 24
+  rst_pin: 25
+  backlight_pin: 18
+  fps: 15
+  default_emotion: neutral
+  hud_enabled: true
+audio:
+  input:
+    enabled: false
+    sample_rate: 16000
+    channels: 1
+    chunk_size: 1024
+    vad_threshold: 0.5
+    silence_timeout_ms: 1500
+  output:
+    enabled: false
+    preferred: bluetooth
+    volume: 80
+    tts_engine: kokoro
+    edge_voice: en-US-JennyNeural
+    elevenlabs_voice_name: Anika
+    elevenlabs_voice_id: ''
+    espeak_voice: en+f3
+    espeak_speed: 165
+  wake_word:
+    enabled: false
+    engine: openwakeword
+    model: hey_jarvis
+    threshold: 0.5
+    vad_enabled: true
+    fallback: vosk_text
+vision:
+  enabled: false
+  source: auto
+  capture_interval_ms: 500
+  detection_confidence: 0.5
+  scene_description: true
+  scan_enabled: true
+  scan_interval: 0.5
+  smolvlm2:
+    enabled: false
+    mock: true
+  moondream:
+    mode: mock
+  face_recognition:
+    mock: true
+motor:
+  enabled: false
+  type: pantilt
+  pan_channel: 0
+  tilt_channel: 1
+  pan_range:
+  - -90
+  - 90
+  tilt_range:
+  - -45
+  - 45
+  speed_default: 50
+  saccade_smoothing: true
+  saccade_steps: 8
+  saccade_duration_ms: 200
+api:
+  enabled: true
+  host: 0.0.0.0
+  port: 8080
+  cors_origins:
+  - '*'
+dream:
+  enabled: true
+  schedule: 02:00
+  min_episodes: 5
+privacy:
+  gpio_button_pin: 17
+  enabled: true
+cognition_extensions:
+  attention:
+    enabled: true
+    focus_decay_seconds: 30
+    salience_threshold: 0.4
+    shift_threshold: 0.8
+    spotlight_size: 3
+  interoception:
+    enabled: true
+    poll_interval_seconds: 10
+    cpu_fatigue_threshold: 85
+    cpu_busy_threshold: 60
+    temp_discomfort_threshold: 70
+    ram_overwhelm_threshold: 85
+  metacognition:
+    enabled: true
+    confidence_threshold: 0.3
+    low_confidence_prefix: true
+  theory_of_mind:
+    enabled: true
+    update_interval_interactions: 5
+  temporal_reasoning:
+    enabled: true
+    pattern_update_interval_seconds: 60
+    causal_detection: true
+  intrinsic_motivation:
+    enabled: true
+    recompute_interval_seconds: 300
+    drives:
+      learn: 0.4
+      help: 0.3
+      explore: 0.2
+      rest: 0.1
+  ideation:
+    enabled: true
+    cooldown_seconds: 60
+    semantic_neighbors_k: 5
+    curiosity_trigger_probability: 0.3
+  imagination:
+    enabled: true
+    cooldown_seconds: 120
+    pre_action_check: false
+  brain_fog:
+    enabled: true
+  internal_monologue:
+    enabled: true
+    think_tokens: 80
+    min_response_tokens: 60
+    thought_consistency: true
+  affective_bias:
+    enabled: true
+    salience_multiplier: 1.3
+    brevity_on_frustrated: true
+  neuroplasticity:
+    correction_detection: true
+    scenario_preferences: true
+    predicted_needs: true
+    persist_knowledge_gaps: true
+  emotional_pregate:
+    enabled: true
+    importance_threshold: 0.2
+wheel_drive:
+  enabled: false
+  left_pins:
+  - 17
+  - 27
+  right_pins:
+  - 22
+  - 23
+  speed_default: 50
+  rotate_speed: 35
+  ramp_ms: 50
+  gaze_rotate_threshold: 45
+  gaze_center_threshold: 15
+synthesis_agent:
+  enabled: true
+  crash_threshold: 3
+  confidence_threshold: 0.2
+  session_synthesis_limit: 5
+tester_agent:
+  enabled: true
+  timeout_seconds: 10
+reflex_registry:
+  enabled: true
+  pattern_threshold: 5
+  max_reflexes: 50
+  similarity_threshold: 0.92
+  prune_after_days: 7
+  promote_after_invocations: 100
+mirror_agent:
+  enabled: false
+gemini_robotics:
+  er_model: gemini-robotics-er-1.6-preview
+  vla_model: gemini-robotics-er-1.6-preview
+  thinking_budget_default: 1024
+  thinking_budget_eco: 256
+  success_threshold: 0.4
+  vla_confidence_threshold: 0.3
+  servo_timeout_s: 5
+  servo_center_tolerance: 0.05
+task_executor:
+  enabled: true
+  script_timeout_seconds: 30
+  max_task_failures: 3
+  monitor_interval_seconds: 1.5
+  monitor_timeout_seconds: 15
+arduino:
+  enabled: false
+  cli_path: arduino-cli

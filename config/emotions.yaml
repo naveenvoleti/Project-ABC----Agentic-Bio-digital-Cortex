@@ -1,0 +1,115 @@
+# Emotion GIF source: https://github.com/txp666/otto-emoji-gif-component/tree/main/gifs
+# Otto GIF → emotion mapping (6 source GIFs → 10 emotion states):
+#   staticstate.gif  →  neutral, attentive, focused
+#   happy.gif        →  happy, excited
+#   buxue.gif        →  curious, confused
+#   sad.gif          →  bored
+#   anger.gif        →  frustrated
+#   scare.gif        →  surprised
+# Run: python scripts/download_emotions.py  (no API key required)
+
+emotions:
+  NEUTRAL:
+    gif: "neutral.gif"
+    color: [30, 30, 50]
+    description: "Calm, resting state"
+    motor_action: "still"
+
+  HAPPY:
+    gif: "happy.gif"
+    color: [255, 200, 50]
+    description: "Task completed or positive interaction"
+    motor_action: "nod_up"
+
+  ATTENTIVE:
+    gif: "attentive.gif"
+    color: [50, 150, 255]
+    description: "Voice or motion detected"
+    motor_action: "turn_toward_sound"
+
+  CURIOUS:
+    gif: "curious.gif"
+    color: [150, 100, 255]
+    description: "Exploring or wondering"
+    motor_action: "scan"
+
+  BORED:
+    gif: "bored.gif"
+    color: [80, 80, 80]
+    description: "Idle for extended time"
+    motor_action: "random_drift"
+
+  FOCUSED:
+    gif: "focused.gif"
+    color: [0, 200, 180]
+    description: "Processing complex query"
+    motor_action: "lean_forward"
+
+  CONFUSED:
+    gif: "confused.gif"
+    color: [200, 150, 50]
+    description: "Ambiguous input received"
+    motor_action: "head_tilt"
+
+  FRUSTRATED:
+    gif: "frustrated.gif"
+    color: [220, 50, 50]
+    description: "Repeated failures"
+    motor_action: "shake"
+
+  SURPRISED:
+    gif: "surprised.gif"
+    color: [255, 255, 100]
+    description: "Unexpected event detected"
+    motor_action: "head_back"
+
+  EXCITED:
+    gif: "excited.gif"
+    color: [255, 100, 200]
+    description: "Very positive or interesting input"
+    motor_action: "nod_burst"
+
+transitions:
+  NEUTRAL:
+    - [voice_detected, ATTENTIVE]
+    - [motion_detected, ATTENTIVE]
+    - [idle_timeout, BORED]
+    - [task_success, HAPPY]
+    - [positive_sentiment, HAPPY]
+
+  ATTENTIVE:
+    - [complex_query, FOCUSED]
+    - [positive_sentiment, HAPPY]
+    - [greeting, HAPPY]
+    - [input_ends, NEUTRAL]
+    - [unexpected_event, SURPRISED]
+
+  FOCUSED:
+    - [inference_failure_3x, FRUSTRATED]
+    - [task_success, HAPPY]
+    - [ambiguous_input, CONFUSED]
+    - [interesting_discovery, EXCITED]
+
+  CONFUSED:
+    - [clarification_received, FOCUSED]
+    - [no_clarification_30s, FRUSTRATED]
+
+  FRUSTRATED:
+    - [reset_30s, NEUTRAL]
+
+  BORED:
+    - [curiosity_trigger, CURIOUS]
+    - [any_input, ATTENTIVE]
+
+  CURIOUS:
+    - [novel_stimulus, ATTENTIVE]
+    - [exploration_timeout, NEUTRAL]
+
+  HAPPY:
+    - [decay_10s, NEUTRAL]
+
+  SURPRISED:
+    - [process_complete, ATTENTIVE]
+
+  EXCITED:
+    - [decay_15s, HAPPY]

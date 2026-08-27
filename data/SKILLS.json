@@ -1,0 +1,12 @@
+{
+  "skills": [
+    {
+      "trigger": "i say 'restart yourself'",
+      "action": "you should execute the _do_web_restart() callback to reboot your system.",
+      "taught_at": "2026-08-12T15:17:29"
+    }
+  ],
+  "reflexes": [],
+  "version": "2.0",
+  "last_updated": "2026-08-12T15:17:29.518770"
+}

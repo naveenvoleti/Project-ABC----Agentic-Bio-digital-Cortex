@@ -1,0 +1,28 @@
+# Hardware override config — auto-detection runs first, this file overrides results
+# Set "enabled: false" to disable a detected device
+# Set "enabled: true" to force-enable (useful for testing)
+
+camera:
+  enabled: auto
+  prefer_csi: true              # Prefer CSI over USB if both available
+  usb_device_index: 0
+
+microphone:
+  enabled: auto
+  device_name: "auto"           # "auto" = first available input device
+
+display:
+  enabled: auto
+  mock_mode: false              # true = simulate display in logs only
+
+bluetooth:
+  enabled: auto
+  speaker_mac: ""               # Set MAC to auto-connect on boot
+
+motors:
+  enabled: auto
+  mock_mode: false
+
+gpio:
+  enabled: auto
+  mock_mode: false              # true = log GPIO ops, no actual hardware

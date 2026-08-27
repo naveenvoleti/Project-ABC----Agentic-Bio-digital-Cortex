@@ -1,0 +1,54 @@
+# ── Core Framework ──────────────────────────────────────────────────────────
+asyncio-mqtt==0.16.2
+pyzmq==27.1.0
+pydantic==2.7.1
+pydantic-settings==2.3.0
+python-dotenv==1.0.1
+pyyaml==6.0.1
+fastapi>=0.110.0
+uvicorn[standard]==0.30.1
+websockets==12.0
+httpx==0.27.0
+
+# ── LLM ─────────────────────────────────────────────────────────────────────
+anthropic==0.30.0
+ollama==0.2.1
+
+# ── NLP ─────────────────────────────────────────────────────────────────────
+spacy>=3.7.4
+# python -m spacy download en_core_web_sm   (run after install)
+
+# ── Speech ──────────────────────────────────────────────────────────────────
+vosk==0.3.45
+pyttsx3==2.90
+pyaudio==0.2.14
+edge-tts>=6.1.9              # Microsoft neural TTS (human-sounding, free, no API key)
+pygame>=2.6.0                # MP3 playback for Edge TTS output
+openwakeword==0.6.0          # wake-word detection (no API key, works on Pi + laptop)
+# ── Vision ───────────────────────────────────────────────────────────────────
+opencv-python-headless==4.10.0.82
+Pillow==10.3.0
+
+# ── Memory / Database ────────────────────────────────────────────────────────
+chromadb>=0.5.0              # persistent HNSW vector DB (replaces sqlite-vec)
+sentence-transformers>=2.7.0 # offline embedding fallback (~90MB model, no API key needed)
+sqlite-vec==0.1.3            # kept for migration script compatibility
+
+# ── Hardware (Raspberry Pi only) ─────────────────────────────────────────────
+# Uncomment on Pi hardware:
+# RPi.GPIO==0.7.1
+# gpiozero==2.0.1
+# pigpio==1.78
+# luma.lcd==2.10.0
+# luma.oled==3.13.0
+# adafruit-circuitpython-pca9685==3.4.14
+# tflite-runtime     # openwakeword backend (arm/x86); swap for tflite on Pi (Not supported on Windows)
+# BlueALSA managed via system packages (see setup.sh)
+
+
+# ── Monitoring / Utils ───────────────────────────────────────────────────────
+psutil==5.9.8
+loguru==0.7.2
+aiofiles==23.2.1
+schedule==1.2.2
+numpy<2

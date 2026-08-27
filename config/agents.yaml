@@ -1,0 +1,245 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Agent Configuration  —  config/agents.yaml
+#
+# Set  enabled: false  to fully disable an agent.  Disabled agents are never
+# built, never started, and never receive messages.  Changes take effect on
+# the next restart — no code changes needed.
+#
+# ⚠  Agents marked [CORE] are required for basic operation.
+#     Disabling them will break the brain; only turn off if you know what
+#     you are doing.
+#
+# ⚠  Agents marked [DEPENDS] list what they need to be useful.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+# ── Perception layer ──────────────────────────────────────────────────────────
+
+vision_agent:
+  enabled: true                 # Camera input + scene description + face recognition
+  # Features inside VisionAgent — all need vision_agent: enabled: true
+  features:
+    scene_description: true     # Moondream VLM captioning (uses cloud API or local model)
+    face_recognition: true      # Identify returning users (needs dlib or OpenCV)
+    motion_detection: true      # Flag high-motion frames as salient events
+    on_demand_vlm: true         # Answer visual questions via Moondream on-demand
+
+auditory_agent:
+  enabled: true                 # [CORE] Microphone input, wake-word, STT
+  features:
+    wake_word: true             # Require "hey brain" before listening (openwakeword)
+    stt: true                   # Vosk offline speech-to-text
+    backchannel: false           # "Mm-hmm / I see" while user speaks for >8s
+    barge_in: true              # Interrupt Brain's speech when user starts talking
+    voice_tone_analysis: true   # Detect calm / excited / frustrated / sad from audio
+
+sensory_agent:
+  enabled: true                 # GPIO sensors: temperature, humidity, light, buttons
+  features:
+    thermal_throttle: true      # Slow inference when Pi CPU temp > threshold
+    privacy_button: true        # Hardware privacy toggle via GPIO button
+
+language_agent:
+  enabled: true                 # [CORE] Intent classification + entity extraction
+  features:
+    spacy_ner: true             # Named entity recognition (needs spacy en_core_web_sm)
+    intent_patterns: true       # Regex intent matching (always on — no dependency)
+
+
+# ── Cognition layer ───────────────────────────────────────────────────────────
+
+cognition_agent:
+  enabled: true                 # [CORE] Memory retrieval, context assembly, routing
+  features:
+    episodic_retrieval: true    # Inject relevant past events into system prompt
+    semantic_retrieval: true    # Inject vector-similar facts into system prompt
+    user_fact_capture: true     # Extract name / location / preferences from speech
+    skill_teaching: true        # Learn "whenever X do Y" patterns
+    context_compaction: true    # Summarise old conversation turns (every 16 turns)
+    vlm_sync: true              # Wait up to 4s for Moondream answer on visual queries
+    mood_arc: true              # Track rolling sentiment; adjust tone accordingly
+    llm_user_insights: true     # LLM-driven user profiling every 5 interactions
+    self_reflection: true       # Periodic introspection (every 30 min of activity)
+
+reasoning_agent:
+  enabled: true                 # [CORE] LLM inference — primary answer generation
+  features:
+    memory_fallback: true       # Search episodic memory if LLM unavailable
+    simplified_retry: true      # Retry with a shorter query on LLM failure
+    follow_up_questions: true   # Append "Does that help?" every 4th response
+
+logic_agent:
+  enabled: true                 # [CORE] Rule-based safety filter (runs before motor)
+  # logic_agent returning None halts the routing chain — disabling it
+  # means motor commands are never safety-checked.
+
+
+# ── Emotion & Behaviour ───────────────────────────────────────────────────────
+
+emotion_engine:
+  enabled: true                 # [CORE] FSM: NEUTRAL / HAPPY / CURIOUS / FRUSTRATED …
+  features:
+    hardware_emotions: true     # Interoception events → emotional state changes
+
+behavior_agent:
+  enabled: true                 # [CORE] Behavioural state: IDLE / ATTENTIVE / FOCUSED / ECO
+  features:
+    eco_mode: true              # Auto low-power mode after long idle periods
+    self_reflect_trigger: true  # Fire SELF_REFLECT every 30 min while active
+    curiosity_trigger: true     # Fire CURIOSITY_TRIGGER after idle timeout
+
+curiosity_agent:
+  enabled: true                 # Autonomous exploration + proactive check-ins when idle
+  features:
+    proactive_checkin: true     # Speak after 3 min of user silence (person must be visible)
+    internal_monologue: true    # LLM-generated curious thoughts during exploration
+    habit_aware_checkin: true   # Reference detected user habits in check-in message
+
+
+# ── Output layer ─────────────────────────────────────────────────────────────
+
+speech_agent:
+  enabled: true                 # [CORE] TTS output queue + emotion-aware speed/volume
+  features:
+    emotion_speed: true         # Adjust speech rate based on current emotion
+    volume_matching: true       # Match loudness to user's voice level
+    interrupt_ack: true         # "Go ahead." after user barge-in
+
+motor_agent:
+  enabled: false                # Pan-tilt / wheel movement (needs motor hardware)
+
+display_agent:
+  enabled: true                 # OLED / TFT / web display for eye expressions + HUD
+
+
+# ── Memory consolidation ──────────────────────────────────────────────────────
+
+dream_agent:
+  enabled: true                 # Nightly memory consolidation (runs at 2 AM via cron)
+  features:
+    fact_extraction: true       # Store key facts in semantic memory
+    personality_evolution: true # Tiny OCEAN trait shifts based on daily interactions
+    relationship_arc: true      # Weekly relationship pattern summary in USER.json
+    habit_detection: true       # Detect recurring hour-of-day interaction patterns
+    memory_decay: true          # Ebbinghaus forgetting curve on old episodes
+    memory_purge: true          # Delete episodes older than 30 days
+
+planner_agent:
+  enabled: true                 # Multi-step plan execution queue
+
+verifier_agent:
+  enabled: true                 # [CORE] Output validation, confidence scoring, retry logic
+  features:
+    hallucination_check: true   # Regex patterns for "I have a body / I was born / …"
+    repetition_check: true      # Reject responses with < 30% unique words
+    confidence_prefix: true     # Prepend "I'm not fully certain, but: " when unsure
+    retry_on_failure: true      # Re-request from reasoning_agent (up to 3 attempts)
+
+
+# ── Higher-order cognitive agents ─────────────────────────────────────────────
+
+attention_agent:
+  enabled: true                 # Attentional spotlight — focus lock + surprise detection
+  # [DEPENDS] cognition_agent uses ATTENTION_FOCUS to bias context assembly
+  features:
+    top_down_focus: true        # Lock onto current intent topic
+    bottom_up_shift: true       # Override focus on high-salience surprise inputs
+    focus_decay: true           # Auto-expire focus after 30s of silence
+
+interoception_agent:
+  enabled: true                 # Hardware vitals → embodied feelings (needs psutil)
+  # [DEPENDS] emotion_engine handles INTERO_STATE events
+  features:
+    cpu_sensing: true           # CPU% → "overwhelmed" / "busy"
+    temp_sensing: true          # CPU temp → "hot"
+    ram_sensing: true           # RAM% → "memory_pressure"
+
+metacognition_agent:
+  enabled: true                 # Confidence scoring on every response
+  # [DEPENDS] verifier_agent uses METACOG_CONFIDENCE as secondary signal
+  features:
+    knowledge_gap_tracking: true  # Log low-confidence topics for IntrinsicMotivation
+
+theory_of_mind_agent:
+  enabled: true                 # Models user expertise, confusion, frustration
+  # [DEPENDS] cognition_agent injects USER_MODEL into system prompt
+  features:
+    heuristic_update: true      # Instant regex-based confusion/frustration detection
+    llm_update: true            # LLM-assisted deep profiling every 5 interactions
+    soul_update: true           # Persist expertise level to USER.json
+
+temporal_reasoning_agent:
+  enabled: true                 # Time-of-day patterns + causal language detection
+  # [DEPENDS] cognition_agent injects TEMPORAL_INSIGHT into system prompt
+  features:
+    time_pattern_learning: true # Track which hours the user is most active
+    causal_chain_detection: true  # Detect "because / leads to / therefore" → LLM chain
+
+intrinsic_motivation_agent:
+  enabled: true                 # Drive hierarchy: learn / help / explore / rest
+  # [DEPENDS] behavior_agent + curiosity_agent receive MOTIVATION_DRIVE
+  features:
+    drive_publishing: true      # Broadcast drive weights every 5 minutes
+    knowledge_gap_absorption: true  # Absorb gaps from MetacognitionAgent
+
+ideation_agent:
+  enabled: true                 # Cross-domain idea synthesis from semantic memory
+  # [DEPENDS] cognition_agent injects IDEATION_RESULT as creative context
+  features:
+    curiosity_trigger_ideation: true  # 30% chance to fire on CURIOSITY_TRIGGER
+    analogy_generation: true          # Generate analogies between concepts
+
+imagination_agent:
+  enabled: true                 # Mental simulation for "what if" queries
+  # [DEPENDS] cognition_agent / planner_agent consume IMAGINATION_SIMULATE
+  features:
+    what_if_detection: true     # Auto-detect hypothetical phrasing in speech
+    consequence_prediction: false  # Pre-action consequence check (expensive, off by default)
+
+
+# ── V10.0 — Sentient Embodied Autonomous Brain ────────────────────────────────
+
+goal_stack_agent:
+  enabled: true                 # Autonomous goal generation from drive signals
+  # [DEPENDS] intrinsic_motivation_agent publishes MOTIVATION_DRIVE that triggers goals
+  # [DEPENDS] planner_agent + learning_agent receive GOAL_PUSH for execution
+  features:
+    drive_to_goal_synthesis: true  # Convert drive states into concrete goal entries
+    autonomous_dispatch: true      # Dispatch goals during human silence (>30s)
+    social_checkin: true           # Proactively speak to present-but-silent user
+
+proprioception_agent:
+  enabled: true                 # Body schema: cumulative pan/tilt/heading/distance tracking
+  # [DEPENDS] motor_agent issues ACTION_MOVE that ProprioceptionAgent tracks
+  # [DEPENDS] world_model receives PROPRIOCEPTION_STATE for prompt injection
+  features:
+    efference_copy: true        # Track every motor command to build pose estimate
+    significant_change_publish: true  # Publish immediately on >5° pan/tilt change
+
+learning_agent:
+  enabled: true                 # Self-directed knowledge gap filling
+  # [DEPENDS] curiosity_agent / goal_stack_agent trigger CURIOSITY_TRIGGER / GOAL_PUSH
+  # [DEPENDS] mcp_tool_registry provides web_search tool for DuckDuckGo lookup
+  # [DEPENDS] semantic_memory stores learned facts for future retrieval
+  features:
+    web_search_fill: true       # Use DuckDuckGo to fill gaps (requires httpx)
+    llm_synthesis: true         # LLM-synthesize knowledge when no web search available
+    failure_queueing: true      # Queue failed LLM queries as learning topics
+  rate_limit:
+    max_per_hour: 3             # Maximum 3 autonomous learning tasks per hour
+    min_interval_s: 60          # Minimum 60s between learning tasks
+    silence_threshold_s: 20     # Only learn when user has been silent 20s
+
+binding_agent:
+  enabled: true                 # GWT phenomenal binding — unified present-moment string
+  # [CORE-ADJACENT] Synthesises all perceptual/affective/motivational streams into
+  # one coherent string injected into every LLM system prompt via CognitionAgent.
+  # Disabling this breaks multi-modal integration but does NOT break core function.
+  features:
+    world_model_integration: true  # Pull scene/audio/presence from WorldModel
+    emotion_integration: true      # Include emotion + valence/arousal in binding
+    pose_integration: true         # Include body orientation from ProprioceptionAgent
+    drive_integration: true        # Include top motivational drive in binding
+    surprise_integration: true     # Include recent WORLD_SURPRISE events (15s TTL)
+  publish_interval_s: 2.0         # How often to publish binding moment (seconds)
+

@@ -1,0 +1,84 @@
+{
+  "identity": {
+    "name": "naveen",
+    "confidence": 0.8,
+    "last_updated": "2026-08-12T14:31:55.721694"
+  },
+  "preferences": [
+    {
+      "fact": "coffie",
+      "confidence": 0.8,
+      "observed_at": "2026-04-14T15:58:35.561169"
+    },
+    {
+      "fact": "my family do you know my name i am your creator",
+      "confidence": 0.8,
+      "observed_at": "2026-04-14T16:00:28.350317"
+    },
+    {
+      "fact": "somthing",
+      "confidence": 0.8,
+      "observed_at": "2026-05-08T05:20:15.429743"
+    },
+    {
+      "fact": "coffie before",
+      "confidence": 0.8,
+      "observed_at": "2026-06-30T05:34:44.859579"
+    }
+  ],
+  "dislikes": [],
+  "topics_of_interest": [],
+  "communication_style": null,
+  "context": {
+    "location": null,
+    "timezone": null,
+    "occupation": "your boss"
+  },
+  "relationship": {
+    "first_interaction": "2026-04-14",
+    "total_interactions": 261,
+    "trust_level": "close",
+    "notes": ""
+  },
+  "llm_insights": [
+    {
+      "text": "Naveen has a two-year-old daughter named Teju, and is curious about someone named Teju.",
+      "added_at": "2026-04-15T04:42:57.110930"
+    },
+    {
+      "text": "Naveen expresses a desire to improve Brain and views themself as Brain's creator.",
+      "added_at": "2026-04-15T08:50:45.324892"
+    },
+    {
+      "text": "Naveen has a child named Teju.",
+      "added_at": "2026-04-17T05:23:16.775295"
+    },
+    {
+      "text": "It sounds like you might have been in the middle of a sentence. Were you describing someone's feelings?\n\nIf you'd like to continue, you could be saying something like:\n* \"...he felt frustrated **being** ignored.\"\n* \"...he felt frustrated **because he had been** working all day.\"\n* \"...he felt frustrated **having been** stuck in traffic.\"\n\n**Would you like to finish that thought, or is there something specific you'd like to talk",
+      "added_at": "2026-05-08T05:31:20.460284"
+    },
+    {
+      "text": "It seems like your message got cut off — you mentioned “he felt frustrated been…” but didn’t finish the thought. Could you clarify or complete what you meant? For example:\n\n- Was he frustrated because of something that’s been happening?\n- Are you sharing a story or seeking advice about someone feeling frustrated?\n\nI’m here to help — just give me a bit more context, and I’ll do my best to support you. 😊",
+      "added_at": "2026-05-08T07:23:50.665819"
+    },
+    {
+      "text": "HelloNaveen! Good to",
+      "added_at": "2026-06-30T05:24:06.499699"
+    },
+    {
+      "text": "I don't have the ability to see images, photos, or anything visual unless they are shared with me directly in our conversation. I'm a text-based AI assistant, so I can only process and respond to text input.\n\nIf you have an image you'd like me to look at, feel free to upload or share",
+      "added_at": "2026-06-30T08:52:45.657877"
+    },
+    {
+      "text": "No need to apologize! 😊\n\nJust to clarify — I can only see the text messages in our conversation. There's no image",
+      "added_at": "2026-08-12T14:31:04.420677"
+    },
+    {
+      "text": "I don't have eyes, so I can't see anything. I'm a text-based AI assistant—I can only process and respond to the text or images you share with me.\n\nIs there something I can help you with? If you have a photo or image you'd like to share, I can try to describe or analyze it. Or if you're looking for help with something specific (like a job",
+      "added_at": "2026-08-12T15:18:33.526442"
+    }
+  ],
+  "knowledge_gaps": [
+    "unknown_topic"
+  ]
+}

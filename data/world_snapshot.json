@@ -1,0 +1,15 @@
+{
+  "presence": {},
+  "scene_description": "A man's head is silhouetted in the foreground against a dimly lit wall. Above and to the sides, a wall-mounted light fixture, some hanging cables, and a framed picture with dark foliage are visible in the shadowy room.",
+  "audio_description": "loud ambient sound",
+  "user_emotion": "",
+  "environment": {},
+  "spatial_objects": [],
+  "body_pose": {
+    "pan_deg": 0.0,
+    "tilt_deg": 0.0,
+    "heading_deg": 0.0,
+    "distance_cm": 0.0
+  },
+  "saved_at": 1786564746.184421
+}

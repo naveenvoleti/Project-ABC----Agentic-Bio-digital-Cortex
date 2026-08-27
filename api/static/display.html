@@ -1,0 +1,2469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project-ABC — Brain Display</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --accent: #00d4ff;
+      --accent2: #7b61ff;
+      --bg: #050a14;
+      --surface: rgba(255,255,255,0.04);
+      --border: rgba(0,212,255,0.15);
+      --text: #e0f0ff;
+      --text-dim: #5a7a99;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ── Scan-line overlay ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.08) 2px,
+        rgba(0,0,0,0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* ── Top HUD bar ── */
+    #hud-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: rgba(0,10,25,0.8);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+      z-index: 5;
+      flex-shrink: 0;
+    }
+
+    .hud-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .hud-brand .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    .hud-center {
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+    }
+
+    .hud-time {
+      font-size: 13px;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Main content area ── */
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Radial glow behind the face */
+    #main::before {
+      content: '';
+      position: absolute;
+      width: 500px; height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,212,255,0.06) 0%, transparent 70%);
+      transition: background 1s ease;
+      pointer-events: none;
+    }
+
+    /* ── Emotion face / GIF container ── */
+    #face-wrap {
+      position: relative;
+      width: 320px; height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Outer ring */
+    #face-ring {
+      position: absolute;
+      inset: -12px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      box-shadow:
+        0 0 20px rgba(0,212,255,0.1),
+        inset 0 0 20px rgba(0,212,255,0.04);
+      animation: ring-spin 20s linear infinite;
+    }
+
+    @keyframes ring-spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    /* Corner tick marks on ring */
+    #face-ring::before, #face-ring::after {
+      content: '';
+      position: absolute;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      top: 50%; left: -4px;
+      transform: translateY(-50%);
+    }
+    #face-ring::after { left: auto; right: -4px; }
+
+    /* GIF / emoji display */
+    #emotion-gif {
+      width: 260px; height: 260px;
+      object-fit: contain;
+      border-radius: 50%;
+      background: rgba(0,20,40,0.5);
+      transition: opacity 0.4s ease;
+    }
+
+    #emotion-emoji {
+      font-size: 180px;
+      line-height: 1;
+      filter: drop-shadow(0 0 20px rgba(0,212,255,0.3));
+      transition: all 0.5s ease;
+      display: none;  /* shown when no GIF */
+    }
+
+    /* ── Emotion label ── */
+    #emotion-label {
+      margin-top: 28px;
+      font-size: 11px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--accent);
+      opacity: 0.7;
+      transition: all 0.5s ease;
+    }
+
+    /* ── Interactive status ── */
+    #interactive-status {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      transition: color 0.4s ease;
+    }
+    #interactive-status .is-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.4s ease, box-shadow 0.4s ease;
+      flex-shrink: 0;
+    }
+    #interactive-status.state-LISTENING {
+      color: #00ff88;
+    }
+    #interactive-status.state-LISTENING .is-dot {
+      background: #00ff88;
+      box-shadow: 0 0 8px #00ff88;
+      animation: pulse-dot 1s ease-in-out infinite;
+    }
+    #interactive-status.state-THINKING,
+    #interactive-status.state-PROCESSING {
+      color: var(--accent2);
+    }
+    #interactive-status.state-THINKING .is-dot,
+    #interactive-status.state-PROCESSING .is-dot {
+      background: var(--accent2);
+      box-shadow: 0 0 8px var(--accent2);
+      animation: pulse-dot 0.6s ease-in-out infinite;
+    }
+    #interactive-status.state-SPEAKING {
+      color: var(--accent);
+    }
+    #interactive-status.state-SPEAKING .is-dot {
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse-dot 0.4s ease-in-out infinite;
+    }
+    #interactive-status.state-IDLE {
+      color: var(--text-dim);
+    }
+    #interactive-status.state-IDLE .is-dot {
+      background: var(--text-dim);
+      box-shadow: none;
+      animation: none;
+    }
+
+    /* ── Speech bubble ── */
+    #speech-wrap {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: 600px;
+      width: 90%;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      transform: translateX(-50%) translateY(8px);
+    }
+
+    #speech-wrap.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    #speech-bubble {
+      background: rgba(0,212,255,0.07);
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 16px;
+      padding: 16px 24px;
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--text);
+      text-align: center;
+      backdrop-filter: blur(12px);
+      position: relative;
+    }
+
+    #speech-bubble::before {
+      content: '"';
+      position: absolute;
+      top: -8px; left: 16px;
+      font-size: 40px;
+      color: var(--accent);
+      opacity: 0.3;
+      line-height: 1;
+    }
+
+    /* Typing cursor when speaking */
+    #speech-cursor {
+      display: inline-block;
+      width: 2px; height: 16px;
+      background: var(--accent);
+      margin-left: 2px;
+      vertical-align: middle;
+      animation: blink 0.8s step-end infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0; }
+    }
+
+    /* ── Bottom HUD bar ── */
+    #hud-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 24px;
+      background: rgba(0,10,25,0.85);
+      border-top: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+      z-index: 5;
+      flex-shrink: 0;
+      gap: 16px;
+    }
+
+    /* ── Chat input bar ── */
+    #chat-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: rgba(0,6,18,0.92);
+      border-top: 1px solid rgba(0,212,255,0.08);
+      backdrop-filter: blur(16px);
+      z-index: 6;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    #chat-hint {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: -22px;
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      opacity: 0.5;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    #chat-bar:focus-within #chat-hint { opacity: 0; }
+
+    #chat-input-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      transition: border-color 0.25s, box-shadow 0.25s;
+      overflow: hidden;
+    }
+    #chat-input-wrap:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent),
+                  0 0 20px color-mix(in srgb, var(--accent) 10%, transparent);
+    }
+
+    #chat-mic-icon {
+      padding: 0 12px;
+      font-size: 15px;
+      opacity: 0.5;
+      pointer-events: none;
+      flex-shrink: 0;
+    }
+
+    #chat-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 14px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      padding: 10px 0;
+      letter-spacing: 0.02em;
+    }
+    #chat-input::placeholder { color: var(--text-dim); opacity: 0.6; }
+    #chat-input:disabled { opacity: 0.4; }
+
+    #chat-send {
+      margin: 4px;
+      padding: 6px 18px;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+      flex-shrink: 0;
+    }
+    #chat-send:hover:not(:disabled)  { opacity: 0.85; transform: scale(1.03); }
+    #chat-send:active:not(:disabled) { transform: scale(0.97); }
+    #chat-send:disabled { opacity: 0.3; cursor: default; }
+
+    /* Thinking dots animation */
+    @keyframes thinking-pulse {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
+      40%           { transform: scale(1);   opacity: 1;   }
+    }
+    #chat-thinking {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.08em;
+      flex-shrink: 0;
+    }
+    #chat-thinking.visible { display: flex; }
+    .t-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: thinking-pulse 1.2s ease-in-out infinite;
+    }
+    .t-dot:nth-child(2) { animation-delay: 0.2s; }
+    .t-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    /* Space-to-focus pulse on the bar */
+    @keyframes chat-nudge {
+      0%, 100% { border-color: rgba(0,212,255,0.08); }
+      50%       { border-color: rgba(0,212,255,0.25); }
+    }
+    #chat-bar.nudge { animation: chat-nudge 1s ease 0s 2; }
+
+    .hud-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .hud-pill .icon {
+      font-size: 14px;
+    }
+
+    .hud-pill .val {
+      color: var(--text);
+    }
+
+    #ws-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .ws-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #ff4444;
+      transition: background 0.3s;
+    }
+
+    .ws-dot.connected { background: #00ff88; box-shadow: 0 0 6px #00ff88; }
+
+    /* ── Emotion-specific accent colours ── */
+    body.emotion-HAPPY    { --accent: #ffd700; --accent2: #ff8c00; }
+    body.emotion-ATTENTIVE{ --accent: #00aaff; --accent2: #0066ff; }
+    body.emotion-CURIOUS  { --accent: #aa66ff; --accent2: #6600cc; }
+    body.emotion-BORED    { --accent: #888888; --accent2: #555555; }
+    body.emotion-FOCUSED  { --accent: #00ffcc; --accent2: #00aa88; }
+    body.emotion-CONFUSED { --accent: #ffaa00; --accent2: #cc7700; }
+    body.emotion-FRUSTRATED{--accent: #ff4444; --accent2: #cc0000; }
+    body.emotion-SURPRISED{ --accent: #ffff00; --accent2: #cccc00; }
+    body.emotion-EXCITED  { --accent: #ff66cc; --accent2: #cc00aa; }
+
+    /* Glitch effect on emotion change */
+    @keyframes glitch {
+      0%   { transform: translate(0); }
+      20%  { transform: translate(-2px, 1px); clip-path: inset(10% 0 60% 0); }
+      40%  { transform: translate(2px, -1px); clip-path: inset(60% 0 10% 0); }
+      60%  { transform: translate(-1px, 0); }
+      80%  { transform: translate(1px, 1px); }
+      100% { transform: translate(0); }
+    }
+
+    .glitch { animation: glitch 0.3s ease; }
+
+    /* ── Toggle buttons (top-right HUD area) ── */
+    .toggle-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #8ab4cc;
+      background: rgba(0,212,255,0.08);
+      border: 1px solid rgba(0,212,255,0.35);
+      border-radius: 6px;
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s, background 0.2s, box-shadow 0.2s;
+      user-select: none;
+    }
+    .toggle-btn:hover {
+      background: rgba(0,212,255,0.15);
+      border-color: rgba(0,212,255,0.6);
+      color: #c0e8ff;
+    }
+    .toggle-btn.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: rgba(0,212,255,0.18);
+      box-shadow: 0 0 8px rgba(0,212,255,0.25);
+    }
+    .toggle-btn .tb-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #4a6a88;
+      transition: background 0.2s, box-shadow 0.2s;
+      flex-shrink: 0;
+    }
+    .toggle-btn.active .tb-dot {
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    /* ── Right vision panel ── */
+    #vision-panel {
+      position: fixed;
+      top: 56px;          /* below HUD */
+      right: 0;
+      width: 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      z-index: 20;
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    }
+    #vision-panel.hidden {
+      transform: translateX(240px);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Live camera feed section */
+    #cam-section {
+      background: rgba(0,6,18,0.92);
+      border-left: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      border-top: 1px solid var(--border);
+      border-radius: 0 0 0 8px;
+      overflow: hidden;
+      transition: max-height 0.3s ease, opacity 0.3s ease;
+      max-height: 200px;
+    }
+    #cam-section.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
+    #cam-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: rgba(0,212,255,0.05);
+      border-bottom: 1px solid var(--border);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    #cam-header .cam-live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #ff4444;
+      transition: background 0.3s;
+    }
+    #cam-header .cam-live-dot.live {
+      background: #00ff88;
+      box-shadow: 0 0 5px #00ff88;
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+    #cam-img {
+      width: 100%;
+      height: auto;
+      display: block;
+      background: #000;
+      min-height: 60px;
+    }
+
+    /* Scene observation section */
+    #scene-section {
+      background: rgba(0,6,18,0.92);
+      border-left: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      border-radius: 0 0 0 8px;
+      overflow: hidden;
+      transition: max-height 0.35s ease, opacity 0.3s ease;
+      max-height: 300px;
+    }
+    #scene-section.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
+    #scene-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: rgba(123,97,255,0.08);
+      border-bottom: 1px solid rgba(123,97,255,0.2);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: var(--accent2);
+      text-transform: uppercase;
+    }
+    #scene-text {
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.55;
+      color: var(--text-dim);
+      min-height: 40px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    #scene-entities {
+      padding: 0 10px 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .entity-tag {
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      background: rgba(0,212,255,0.1);
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 4px;
+      padding: 2px 6px;
+      text-transform: uppercase;
+    }
+
+    /* ── Vision feed (small corner preview) — kept for compat, hidden ── */
+    #vision-feed {
+      display: none;
+    }
+
+    /* ── Thinking panel ── */
+    #think-section {
+      background: rgba(0,6,18,0.92);
+      border-left: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      border-radius: 0 0 0 8px;
+      overflow: hidden;
+      transition: max-height 0.35s ease, opacity 0.3s ease;
+      max-height: 320px;
+    }
+    #think-section.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
+    #think-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: rgba(0,255,180,0.06);
+      border-bottom: 1px solid rgba(0,255,180,0.15);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: #00ffb4;
+      text-transform: uppercase;
+    }
+    #think-text {
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.6;
+      color: #7ab8a0;
+      font-style: italic;
+      min-height: 40px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    #think-age {
+      font-size: 8px;
+      opacity: 0.5;
+    }
+
+    /* ── Event log (bottom left) ── */
+    #event-log {
+      position: absolute;
+      bottom: 60px;
+      left: 16px;
+      width: 220px;
+      font-size: 10px;
+      color: var(--text-dim);
+      line-height: 1.8;
+      letter-spacing: 0.05em;
+      pointer-events: none;
+    }
+
+    .log-entry {
+      opacity: 0;
+      transform: translateX(-8px);
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    .log-entry.show { opacity: 1; transform: none; }
+    .log-entry.fade { opacity: 0; }
+    /* ── Boot log panel (shown during initialisation) ── */
+    #boot-log-wrap {
+      margin-top: 18px;
+      width: 380px;
+      max-width: 90vw;
+      display: none;  /* shown by showLoading() */
+      flex-direction: column;
+      gap: 5px;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+
+    .boot-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.04em;
+      opacity: 0;
+      transform: translateY(5px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .boot-line.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .boot-line.active {
+      color: var(--accent);
+    }
+    .boot-line .bl-bar {
+      flex-shrink: 0;
+      width: 2px;
+      height: 10px;
+      background: var(--text-dim);
+      border-radius: 2px;
+    }
+    .boot-line.active .bl-bar {
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      animation: pulse-dot 1s ease-in-out infinite;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       Config Overlay
+    ══════════════════════════════════════════════════════════════ */
+    #cfg-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(5px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s ease;
+    }
+    #cfg-overlay.open { opacity: 1; pointer-events: all; }
+
+    #cfg-panel {
+      background: #050b16;
+      border: 1px solid rgba(0,212,255,0.28);
+      border-radius: 16px;
+      width: 700px;
+      max-width: 96vw;
+      max-height: 84vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 48px rgba(0,212,255,0.12), 0 0 100px rgba(0,0,0,0.9);
+      overflow: hidden;
+    }
+
+    #cfg-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    #cfg-close {
+      background: none; border: none;
+      color: var(--text-dim); font-size: 18px; line-height: 1;
+      cursor: pointer; padding: 2px 6px; border-radius: 4px;
+      transition: color 0.2s;
+    }
+    #cfg-close:hover { color: var(--accent); }
+
+    #cfg-tabs-bar {
+      display: flex; gap: 0;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      background: rgba(0,6,18,0.6);
+    }
+    .cfg-tab {
+      background: none; border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-dim);
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      padding: 10px 16px 8px;
+      cursor: pointer;
+      transition: color 0.18s, border-color 0.18s;
+      margin-bottom: -1px;
+    }
+    .cfg-tab:hover { color: var(--text); }
+    .cfg-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    #cfg-body {
+      flex: 1; overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,212,255,0.25) transparent;
+    }
+    .cfg-pane { padding: 20px; }
+    .cfg-pane.cfg-pane-hidden { display: none; }
+
+    .cfg-section { margin-bottom: 22px; }
+    .cfg-section-title {
+      font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--accent); opacity: 0.55;
+      padding-bottom: 6px; margin-bottom: 10px;
+      border-bottom: 1px solid rgba(0,212,255,0.1);
+    }
+    .cfg-row {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 7px 0; gap: 16px;
+    }
+    .cfg-row + .cfg-row { border-top: 1px solid rgba(255,255,255,0.03); }
+    .cfg-label { font-size: 12px; color: var(--text); flex: 1; min-width: 0; }
+    .cfg-label small { display: block; font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+    .cfg-ctrl { flex-shrink: 0; }
+
+    /* Toggle */
+    .cfg-toggle { position: relative; width: 40px; height: 22px; display: inline-block; }
+    .cfg-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .cfg-toggle-track {
+      position: absolute; inset: 0; border-radius: 11px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .cfg-toggle input:checked + .cfg-toggle-track {
+      background: rgba(0,212,255,0.28); border-color: var(--accent);
+    }
+    .cfg-toggle-track::after {
+      content: ''; position: absolute;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #4a6a88; top: 2px; left: 2px;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .cfg-toggle input:checked + .cfg-toggle-track::after {
+      transform: translateX(18px);
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    /* Text / number input */
+    .cfg-input {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text);
+      font-size: 12px; padding: 6px 10px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+      width: 200px;
+    }
+    .cfg-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(0,212,255,0.14);
+    }
+    .cfg-input.narrow { width: 80px; }
+    .cfg-input.wide   { width: 300px; }
+    .cfg-input.full   { width: 100%; }
+
+    /* Select */
+    .cfg-select {
+      background: rgba(0,6,18,0.9);
+      border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text);
+      font-size: 12px; padding: 6px 10px;
+      outline: none; cursor: pointer; width: 150px;
+      transition: border-color 0.2s;
+    }
+    .cfg-select:focus { border-color: var(--accent); }
+
+    /* Range */
+    .cfg-range-wrap { display: flex; align-items: center; gap: 8px; }
+    .cfg-range {
+      -webkit-appearance: none; width: 110px; height: 4px;
+      border-radius: 2px; background: rgba(255,255,255,0.1); outline: none;
+    }
+    .cfg-range::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px;
+      border-radius: 50%; background: var(--accent); cursor: pointer;
+      box-shadow: 0 0 6px var(--accent);
+    }
+    .cfg-range-val {
+      font-size: 11px; color: var(--accent);
+      min-width: 36px; text-align: right; font-variant-numeric: tabular-nums;
+    }
+
+    /* Provider grid */
+    .cfg-provider-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 8px; margin-bottom: 14px;
+    }
+    .cfg-provider-btn {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 5px; padding: 10px 6px;
+      border: 1px solid var(--border); border-radius: 10px;
+      background: rgba(255,255,255,0.02);
+      color: var(--text-dim); font-size: 9px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      cursor: pointer; transition: all 0.18s; text-align: center;
+    }
+    .cfg-provider-btn:hover { border-color: rgba(0,212,255,0.4); color: var(--text); }
+    .cfg-provider-btn.selected {
+      border-color: var(--accent); background: rgba(0,212,255,0.1);
+      color: var(--accent); box-shadow: 0 0 12px rgba(0,212,255,0.15);
+    }
+    .cfg-provider-icon { font-size: 20px; }
+    .cfg-provider-fields { display: none; }
+    .cfg-provider-fields.visible { display: block; }
+
+    /* Footer */
+    #cfg-footer {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 20px; border-top: 1px solid var(--border); flex-shrink: 0;
+      background: rgba(0,6,18,0.6);
+    }
+    #cfg-status { flex: 1; font-size: 11px; color: var(--text-dim); }
+    #cfg-status.ok  { color: #00ff88; }
+    #cfg-status.err { color: #ff4444; }
+    .cfg-btn {
+      padding: 7px 18px;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: rgba(255,255,255,0.04); color: var(--text-dim);
+      font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; cursor: pointer; transition: all 0.18s;
+    }
+    .cfg-btn:hover { border-color: rgba(0,212,255,0.4); color: var(--text); }
+    .cfg-btn.primary {
+      background: var(--accent); border-color: var(--accent); color: #000;
+    }
+    .cfg-btn.primary:hover { opacity: 0.85; }
+    .cfg-btn.primary:disabled { opacity: 0.4; cursor: default; }
+    .cfg-btn.danger {
+      border-color: rgba(255,80,80,0.4); color: #ff6060;
+    }
+    .cfg-btn.danger:hover { border-color: #ff4444; color: #ff4444; background: rgba(255,60,60,0.08); }
+    .cfg-btn.danger:disabled { opacity: 0.4; cursor: default; }
+
+    /* Radio-style primary selector */
+    .cfg-radio-group { display: flex; gap: 8px; margin-bottom: 14px; }
+    .cfg-radio-btn {
+      flex: 1; display: flex; flex-direction: column; gap: 3px;
+      padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+      background: rgba(255,255,255,0.02); cursor: pointer; transition: all 0.18s;
+    }
+    .cfg-radio-btn:hover { border-color: rgba(0,212,255,0.4); }
+    .cfg-radio-btn.selected {
+      border-color: var(--accent); background: rgba(0,212,255,0.1);
+      box-shadow: 0 0 12px rgba(0,212,255,0.12);
+    }
+    .cfg-radio-btn strong { font-size: 12px; color: var(--text); }
+    .cfg-radio-btn.selected strong { color: var(--accent); }
+    .cfg-radio-btn small { font-size: 10px; color: var(--text-dim); }
+
+    /* Fallback provider blocks */
+    .cfg-fallback-block {
+      border: 1px solid rgba(255,255,255,0.06); border-radius: 10px;
+      margin-bottom: 8px; overflow: hidden;
+    }
+    .cfg-fallback-hdr {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; background: rgba(255,255,255,0.03); cursor: default;
+    }
+    .cfg-fallback-label { font-size: 12px; color: var(--text); font-weight: 600; }
+    .cfg-fallback-sub { display: none; padding: 4px 14px 10px; }
+    .cfg-fallback-sub.visible { display: block; }
+    .cfg-fallback-sub .cfg-row { border-top: 1px solid rgba(255,255,255,0.04); }
+    .cfg-fallback-sub .cfg-row:first-child { border-top: none; }
+
+    /* ── Streaming think bar ── */
+    #stream-think {
+      position: absolute;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: 580px;
+      width: 88%;
+      background: rgba(0,255,180,0.06);
+      border: 1px solid rgba(0,255,180,0.18);
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 11px;
+      font-style: italic;
+      color: #7ab8a0;
+      line-height: 1.5;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      pointer-events: none;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 80px;
+      overflow: hidden;
+    }
+    #stream-think.visible { opacity: 1; }
+
+    /* Info note */
+    .cfg-note {
+      font-size: 10px; color: var(--text-dim); font-style: italic;
+      padding: 4px 0 10px; line-height: 1.5;
+    }
+  </style>
+</head>
+<body class="emotion-NEUTRAL">
+
+  <!-- TOP HUD -->
+  <div id="hud-top">
+    <div class="hud-brand">
+      <div class="dot"></div>
+      Project-ABC Brain
+    </div>
+    <div class="hud-center" id="hud-behavior">IDLE</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="toggle-btn" id="btn-hw-cam" title="Toggle Hardware Camera" onclick="toggleHwCam()">
+        <span class="tb-dot"></span>HW CAM
+      </button>
+      <button class="toggle-btn" id="btn-hw-mic" title="Toggle Hardware Mic" onclick="toggleHwMic()">
+        <span class="tb-dot"></span>HW MIC
+      </button>
+      <button class="toggle-btn" id="btn-cam" title="Toggle live camera feed" onclick="toggleCam()">
+        <span class="tb-dot"></span>CAM
+      </button>
+      <button class="toggle-btn" id="btn-scene" title="Toggle scene observation" onclick="toggleScene()">
+        <span class="tb-dot"></span>SCENE
+      </button>
+      <button class="toggle-btn" id="btn-think" title="Toggle thinking panel" onclick="toggleThink()">
+        <span class="tb-dot"></span>THINK
+      </button>
+      <button class="toggle-btn" id="btn-cfg" title="Configure brain" onclick="openCfg()">
+        <span class="tb-dot"></span>CFG
+      </button>
+      <div class="hud-time" id="hud-time">00:00:00</div>
+    </div>
+  </div>
+
+  <!-- MAIN DISPLAY -->
+  <div id="main">
+
+    <!-- Face / emotion GIF -->
+    <div id="face-wrap">
+      <div id="face-ring"></div>
+      <img id="emotion-gif" src="/static/loading.gif" alt="" />
+      <div id="emotion-emoji" style="display:none">⏳</div>
+    </div>
+
+    <div id="emotion-label">INITIALIZING</div>
+
+    <!-- Interactive state below face -->
+    <div id="interactive-status" class="state-IDLE">
+      <span class="is-dot"></span>
+      <span id="interactive-status-text">IDLE</span>
+    </div>
+
+    <!-- Boot log: live init progress (hidden once brain is ready) -->
+    <div id="boot-log-wrap"></div>
+
+    <!-- Streaming thinking bar (shown above speech bubble during streaming) -->
+    <div id="stream-think"></div>
+
+    <!-- Speech bubble -->
+    <div id="speech-wrap">
+      <div id="speech-bubble">
+        <span id="speech-text"></span>
+        <span id="speech-cursor"></span>
+      </div>
+    </div>
+
+    <!-- Vision preview (top-right corner) -->
+    <div id="vision-feed">
+      <div id="vision-label">CAM</div>
+    </div>
+
+    <!-- Event log (bottom-left) -->
+    <div id="event-log"></div>
+
+  </div>
+
+  <!-- RIGHT VISION PANEL (fixed, slide-in from right) -->
+  <div id="vision-panel" class="hidden">
+    <!-- Live camera feed -->
+    <div id="cam-section" class="collapsed">
+      <div id="cam-header">
+        <span>Live Camera</span>
+        <span class="cam-live-dot" id="cam-live-dot"></span>
+      </div>
+      <img id="cam-img" src="" alt="camera feed" />
+    </div>
+    <!-- Scene observation -->
+    <div id="scene-section" class="collapsed">
+      <div id="scene-header">
+        <span>Observing</span>
+        <span style="opacity:0.5;font-size:8px" id="scene-age"></span>
+      </div>
+      <div id="scene-text">Waiting for scene data…</div>
+      <div id="scene-entities"></div>
+    </div>
+    <!-- Thinking panel -->
+    <div id="think-section" class="collapsed">
+      <div id="think-header">
+        <span>💭 Thinking</span>
+        <span id="think-age" class="think-age"></span>
+      </div>
+      <div id="think-text">Waiting for thought…</div>
+    </div>
+  </div>
+
+  <!-- BOTTOM HUD -->
+  <div id="hud-bottom">
+    <div class="hud-pill">
+      <span class="icon">🎭</span>
+      <span>Emotion:</span>
+      <span class="val" id="hud-emotion">NEUTRAL</span>
+    </div>
+    <div class="hud-pill">
+      <span class="icon">🧠</span>
+      <span>Agents:</span>
+      <span class="val" id="hud-agents">—</span>
+    </div>
+    <div class="hud-pill">
+      <span class="icon">📡</span>
+      <span>Memory:</span>
+      <span class="val" id="hud-memory">—</span>
+    </div>
+    <div id="ws-status">
+      <div class="ws-dot" id="ws-dot"></div>
+      <span id="ws-label">Connecting...</span>
+    </div>
+  </div>
+
+  <!-- CHAT INPUT BAR -->
+  <div id="chat-bar">
+    <span id="chat-hint">PRESS SPACE TO FOCUS · ENTER TO SEND</span>
+    <div id="chat-input-wrap">
+      <span id="chat-mic-icon">💬</span>
+      <input
+        id="chat-input"
+        type="text"
+        placeholder="Type a message... (Space to focus, Enter to send)"
+        autocomplete="off"
+        spellcheck="false"
+        maxlength="500"
+      />
+      <button id="chat-send" title="Send (Enter)">SEND ↑</button>
+    </div>
+    <div id="chat-thinking">
+      <div class="t-dot"></div>
+      <div class="t-dot"></div>
+      <div class="t-dot"></div>
+    </div>
+  </div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     CONFIG OVERLAY
+════════════════════════════════════════════════════════════ -->
+<div id="cfg-overlay">
+  <div id="cfg-panel">
+    <div id="cfg-hdr">
+      <div>⚙ &nbsp;Configuration</div>
+      <button id="cfg-close" title="Close (Esc)">✕</button>
+    </div>
+    <div id="cfg-tabs-bar">
+      <button class="cfg-tab active" data-tab="llm">LLM</button>
+      <button class="cfg-tab" data-tab="brain">Brain</button>
+      <button class="cfg-tab" data-tab="audio">Audio</button>
+      <button class="cfg-tab" data-tab="vision">Vision</button>
+      <button class="cfg-tab" data-tab="cognition">Cognition</button>
+    </div>
+    <div id="cfg-body">
+      <div class="cfg-pane" id="cfg-pane-llm"></div>
+      <div class="cfg-pane cfg-pane-hidden" id="cfg-pane-brain"></div>
+      <div class="cfg-pane cfg-pane-hidden" id="cfg-pane-audio"></div>
+      <div class="cfg-pane cfg-pane-hidden" id="cfg-pane-vision"></div>
+      <div class="cfg-pane cfg-pane-hidden" id="cfg-pane-cognition"></div>
+    </div>
+    <div id="cfg-footer">
+      <span id="cfg-status"></span>
+      <button class="cfg-btn" id="cfg-cancel">Cancel</button>
+      <button class="cfg-btn danger" id="cfg-restart-btn">Restart Brain</button>
+      <button class="cfg-btn primary" id="cfg-save-btn">Save Config</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Emotion → Emoji fallback map ──
+const EMOTION_EMOJI = {
+  NEUTRAL:    '😐',
+  HAPPY:      '😄',
+  ATTENTIVE:  '👀',
+  CURIOUS:    '🤔',
+  BORED:      '😴',
+  FOCUSED:    '🧐',
+  CONFUSED:   '😕',
+  FRUSTRATED: '😤',
+  SURPRISED:  '😲',
+  EXCITED:    '🤩',
+};
+
+// ── State ──
+let currentEmotion = '';  // empty so first setEmotion('NEUTRAL') always loads the GIF
+let speechTimer = null;
+let ws = null;
+let reconnectDelay = 1000;
+
+// ── DOM refs ──
+const $gif       = document.getElementById('emotion-gif');
+const $emoji     = document.getElementById('emotion-emoji');
+const $label     = document.getElementById('emotion-label');
+const $speech    = document.getElementById('speech-wrap');
+const $text      = document.getElementById('speech-text');
+const $cursor    = document.getElementById('speech-cursor');
+const $body      = document.body;
+const $wsDot     = document.getElementById('ws-dot');
+const $wsLabel   = document.getElementById('ws-label');
+const $hudEmotion= document.getElementById('hud-emotion');
+const $hudBehavior= document.getElementById('hud-behavior');
+const $hudAgents = document.getElementById('hud-agents');
+const $log       = document.getElementById('event-log');
+const $iStatus   = document.getElementById('interactive-status');
+const $iStatusTxt= document.getElementById('interactive-status-text');
+
+// ── Clock ──
+setInterval(() => {
+  document.getElementById('hud-time').textContent =
+    new Date().toLocaleTimeString('en-GB');
+}, 1000);
+
+// ── Emotion update ──
+function setEmotion(emotion) {
+  if (emotion === currentEmotion) return;
+  currentEmotion = emotion;
+
+  // Swap accent colour via class
+  $body.className = `emotion-${emotion}`;
+
+  // Glitch flash
+  $gif.classList.remove('glitch');
+  void $gif.offsetWidth;
+  $gif.classList.add('glitch');
+
+  // Load GIF from server — hide emoji first, show GIF on load
+  const gifUrl = `/emotions/${emotion.toLowerCase()}.gif?t=${Date.now()}`;
+  $emoji.style.display = 'none';
+  $gif.style.opacity = '0';
+  $gif.style.display = 'block';
+  $gif.onload  = () => { $gif.style.opacity = '1'; };
+  $gif.onerror = () => {
+    $gif.style.display = 'none';
+    $emoji.textContent = EMOTION_EMOJI[emotion] || '😐';
+    $emoji.style.display = 'flex';
+  };
+  $gif.src = gifUrl;
+
+  // Label
+  $label.textContent = emotion;
+  $hudEmotion.textContent = emotion;
+
+  logEvent(`🎭 ${emotion}`);
+}
+
+// ── Speech bubble ──
+function showSpeech(text) {
+  // If streaming is still active, close it out first before showing TTS text
+  if (_streaming) finaliseStream();
+  $text.innerHTML = marked.parse(text);
+  $cursor.style.display = 'inline-block';
+  $speech.classList.add('visible');
+
+  clearTimeout(speechTimer);
+  const duration = Math.max(3000, text.length * 60);
+  speechTimer = setTimeout(() => {
+    $cursor.style.display = 'none';
+    $speech.classList.remove('visible');
+    setInteractiveStatus('IDLE');
+  }, duration);
+
+  // Unblock chat input after brain speaks
+  if (typeof chatPending !== 'undefined' && chatPending) {
+    setTimeout(() => setChatBusy(false), 400);
+  }
+}
+
+// ── Event log ──
+const logEntries = [];
+function logEvent(msg) {
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  el.textContent = `[${new Date().toLocaleTimeString('en-GB')}] ${msg}`;
+  $log.prepend(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+
+  logEntries.push(el);
+  if (logEntries.length > 6) {
+    const old = logEntries.shift();
+    old.classList.add('fade');
+    setTimeout(() => old.remove(), 400);
+  }
+}
+
+// ── Streaming ──
+const $streamThink = document.getElementById('stream-think');
+let _streamBuf = '';
+let _streamThinkBuf = '';
+let _streaming = false;
+let _streamTimer = null;
+
+function appendStreamToken(token) {
+  if (!_streaming) {
+    // First token — open the speech bubble immediately (no fade delay)
+    _streaming = true;
+    _streamBuf = '';
+    $text.textContent = '';
+    $cursor.style.display = 'inline-block';
+    // Bypass CSS transition so the bubble appears instantly on first token
+    $speech.style.transition = 'none';
+    $speech.style.opacity = '1';
+    $speech.classList.add('visible');
+    setInteractiveStatus('SPEAKING');
+    clearTimeout(speechTimer);
+    console.log('[STREAM] started');
+  }
+  _streamBuf += token;
+  $text.textContent = _streamBuf;
+  console.log('[STREAM] token:', token.slice(0, 20));
+}
+
+function appendStreamThink(token) {
+  if (!_streamThinkBuf) {
+    // First thinking token — auto-open THINK panel and mark active
+    if (!thinkOn) toggleThink();
+    $thinkAge.textContent = new Date().toLocaleTimeString('en-GB');
+    setInteractiveStatus('THINKING');
+  }
+  _streamThinkBuf += token;
+  // Show the last 800 chars so the panel scrolls to latest reasoning
+  $thinkText.textContent = _streamThinkBuf.slice(-800);
+}
+
+function finaliseStream() {
+  // Mark thinking complete in the right panel
+  if (_streamThinkBuf) {
+    $thinkText.textContent = _streamThinkBuf;  // keep full trace
+    $thinkAge.textContent = '✓ ' + new Date().toLocaleTimeString('en-GB');
+  }
+  _streamThinkBuf = '';
+
+  if (!_streaming) return;
+  _streaming = false;
+
+  // Restore transition for future non-streaming use
+  $speech.style.transition = '';
+  $speech.style.opacity = '';
+
+  // Render the accumulated text as markdown
+  $text.innerHTML = typeof marked !== 'undefined' ? marked.parse(_streamBuf) : _streamBuf;
+  $cursor.style.display = 'none';
+
+  const duration = Math.max(4000, _streamBuf.length * 55);
+  clearTimeout(speechTimer);
+  speechTimer = setTimeout(() => {
+    $speech.classList.remove('visible');
+    setInteractiveStatus('IDLE');
+  }, duration);
+
+  logEvent(`🗣 ${_streamBuf.substring(0, 40)}${_streamBuf.length > 40 ? '…' : ''}`);
+  _streamBuf = '';
+  console.log('[STREAM] finalised');
+}
+
+// ── Interactive status (below face) ──
+function setInteractiveStatus(state) {
+  const s = (state || 'IDLE').toUpperCase();
+  $iStatusTxt.textContent = s;
+  $iStatus.className = `state-${s}`;
+  $hudBehavior.textContent = s;
+}
+
+// ── Status fetch ──
+async function fetchStatus() {
+  try {
+    const r = await fetch('/status');
+    const d = await r.json();
+    $hudAgents.textContent = d.agents ? d.agents.length : '—';
+    if (d.emotion) setEmotion(d.emotion);
+    if (d.behavior) setInteractiveStatus(d.behavior);
+    document.getElementById('hud-memory').textContent = 'OK';
+  } catch { /* ignore */ }
+}
+
+// ── WebSocket ──
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+  ws.onopen = () => {
+    $wsDot.className = 'ws-dot connected';
+    $wsLabel.textContent = 'Connected';
+    reconnectDelay = 1000;
+    fetchStatus();
+    logEvent('🟢 Brain connected');
+  };
+
+  ws.onclose = () => {
+    $wsDot.className = 'ws-dot';
+    $wsLabel.textContent = 'Reconnecting...';
+    logEvent('🔴 Connection lost');
+    // If brain was never ready, keep showing loading gif while reconnecting
+    if (!brainReady) showLoading();
+    setTimeout(connect, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 2, 10000);
+  };
+
+  ws.onerror = () => ws.close();
+
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+
+    // Any real event from brain → leave loading screen
+    if (msg.type && msg.type !== 'heartbeat' && msg.type !== 'error'
+        && msg.type !== 'initializing') {
+      onBrainReady();
+    }
+
+    switch (msg.type) {
+      case 'emotion.change':
+        if (msg.data?.to) setEmotion(msg.data.to);
+        break;
+
+      case 'stream.token':
+        if (msg.data?.done) {
+          finaliseStream();
+        } else if (msg.data?.thinking) {
+          appendStreamThink(msg.data.token || '');
+        } else if (msg.data?.token) {
+          appendStreamToken(msg.data.token);
+        }
+        break;
+
+      case 'action.speak':
+        if (msg.data?.text) {
+          showSpeech(msg.data.text);
+          setInteractiveStatus('SPEAKING');
+          logEvent(`🗣 ${msg.data.text.substring(0, 40)}${msg.data.text.length > 40 ? '…' : ''}`);
+        }
+        break;
+
+      case 'cognition.thought':
+        if (msg.data?.thought) {
+          showThought(msg.data.thought);
+          setInteractiveStatus('THINKING');
+          logEvent(`💭 Thinking…`);
+        }
+        break;
+
+      case 'perception.speech':
+        if (msg.data?.text) {
+          setInteractiveStatus('LISTENING');
+          logEvent(`💬 "${msg.data.text.substring(0, 35)}"`);
+        }
+        break;
+
+      case 'behavior.change':
+        if (msg.data?.state) {
+          setInteractiveStatus(msg.data.state);
+          logEvent(`⚙ Behavior → ${msg.data.state}`);
+        }
+        break;
+
+      case 'perception.vision':
+        if (msg.data?.scene) logEvent(`👁 ${msg.data.scene.substring(0, 35)}`);
+        break;
+
+      case 'system.error':
+        logEvent(`⚠ ${msg.data?.error || 'Error'}`);
+        break;
+
+      case 'heartbeat':
+      case 'initializing':
+        // Update the live boot-log panel
+        if (msg.log && Array.isArray(msg.log)) updateBootLog(msg.log);
+        else if (msg.status) updateBootLog([msg.status]);
+        break; // keep loading screen
+
+      case 'world.update':
+      case 'scene.change':
+      case 'person.enter':
+      case 'person.leave':
+      case 'gaze.direct':
+      case 'audio.event':
+        _handleWorldMsg(msg);
+        break;
+
+      default:
+        break;
+    }
+  };
+}
+
+// ── Chat bar ──────────────────────────────────────────────────────────────
+const $chatInput   = document.getElementById('chat-input');
+const $chatSend    = document.getElementById('chat-send');
+const $chatThink   = document.getElementById('chat-thinking');
+const $chatBar     = document.getElementById('chat-bar');
+let   chatPending  = false;
+
+function setChatBusy(busy) {
+  chatPending = busy;
+  $chatInput.disabled = busy;
+  $chatSend.disabled  = busy;
+  $chatThink.classList.toggle('visible', busy);
+  if (!busy) {
+    $chatInput.focus();
+  }
+}
+
+async function sendChat() {
+  const text = $chatInput.value.trim();
+  if (!text || chatPending) return;
+
+  $chatInput.value = '';
+  setChatBusy(true);
+
+  try {
+    const resp = await fetch('/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    // Response will arrive as action.speak via WebSocket — unblock after timeout
+    setTimeout(() => setChatBusy(false), 8000);  // max wait 8s
+  } catch (err) {
+    logEvent(`⚠ Chat error: ${err.message}`);
+    setChatBusy(false);
+  }
+}
+
+// Send on Enter key
+$chatInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    sendChat();
+  } else if (e.key === 'Escape') {
+    $chatInput.blur();
+  }
+});
+
+// Send button click
+$chatSend.addEventListener('click', sendChat);
+
+// Space anywhere on page (when not already focused on input) → focus input
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement?.tagName;
+  if (e.code === 'Space' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+    e.preventDefault();
+    $chatInput.focus();
+    // Nudge animation to show the bar activated
+    $chatBar.classList.remove('nudge');
+    void $chatBar.offsetWidth;
+    $chatBar.classList.add('nudge');
+  }
+});
+
+// ── Boot log panel ──
+function updateBootLog(lines) {
+  const wrap = document.getElementById('boot-log-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  lines.forEach((line, i) => {
+    const el  = document.createElement('div');
+    const bar = document.createElement('span');
+    bar.className = 'bl-bar';
+    el.className = 'boot-line' + (i === lines.length - 1 ? ' active' : '');
+    el.appendChild(bar);
+    el.appendChild(document.createTextNode(line));
+    wrap.appendChild(el);
+    // Stagger the entrance animation
+    setTimeout(() => el.classList.add('show'), i * 40);
+  });
+}
+
+// ── Loading state ──
+// Show loading.gif until brain sends its first real event
+let brainReady = false;
+
+function showLoading() {
+  // Only change the src if we're NOT already showing loading.gif.
+  const currentSrc = $gif.getAttribute('src') || '';
+  if (!currentSrc.includes('/static/loading.gif')) {
+    $gif.onerror = null;
+    $gif.onload  = null;
+    $gif.src = '/static/loading.gif';
+  }
+  $gif.style.opacity = '1';
+  $gif.style.display = 'block';
+  $emoji.style.display = 'none';
+  $label.textContent = 'INITIALIZING';
+  $hudEmotion.textContent = '\u2014';
+  $body.className = 'emotion-NEUTRAL';
+  currentEmotion = '';
+  // Show boot-log panel
+  const bl = document.getElementById('boot-log-wrap');
+  if (bl) { bl.style.opacity = '1'; bl.style.display = 'flex'; }
+}
+
+function onBrainReady() {
+  if (brainReady) return;
+  brainReady = true;
+  // Fade out boot-log panel
+  const bl = document.getElementById('boot-log-wrap');
+  if (bl) {
+    bl.style.opacity = '0';
+    setTimeout(() => { bl.style.display = 'none'; bl.innerHTML = ''; }, 500);
+  }
+  setEmotion('NEUTRAL');
+  fetchStatus();
+}
+
+// ── Vision panel state ──
+let camOn   = false;
+let sceneOn = false;
+let thinkOn = false;
+let scenePoller = null;
+
+const $panel        = document.getElementById('vision-panel');
+const $camSection   = document.getElementById('cam-section');
+const $sceneSection = document.getElementById('scene-section');
+const $thinkSection = document.getElementById('think-section');
+const $camImg       = document.getElementById('cam-img');
+const $camDot       = document.getElementById('cam-live-dot');
+const $sceneText    = document.getElementById('scene-text');
+const $sceneEntities= document.getElementById('scene-entities');
+const $sceneAge     = document.getElementById('scene-age');
+const $thinkText    = document.getElementById('think-text');
+const $thinkAge     = document.getElementById('think-age');
+const $btnCam       = document.getElementById('btn-cam');
+const $btnScene     = document.getElementById('btn-scene');
+const $btnThink     = document.getElementById('btn-think');
+
+function _syncPanel() {
+  const anyOn = camOn || sceneOn || thinkOn;
+  $panel.classList.toggle('hidden', !anyOn);
+  $camSection.classList.toggle('collapsed', !camOn);
+  $sceneSection.classList.toggle('collapsed', !sceneOn);
+  $thinkSection.classList.toggle('collapsed', !thinkOn);
+}
+
+function toggleThink() {
+  thinkOn = !thinkOn;
+  $btnThink.classList.toggle('active', thinkOn);
+  _syncPanel();
+}
+
+function showThought(text) {
+  if (!thinkOn) return;
+  $thinkText.textContent = text;
+  $thinkAge.textContent = new Date().toLocaleTimeString('en-GB');
+}
+
+let camPoller = null;
+
+function _refreshSnapshot() {
+  if (!camOn) return;
+  const url = `/snapshot?t=${Date.now()}`;
+  const img = new Image();
+  img.onload = () => {
+    $camImg.src = img.src;
+    $camDot.classList.add('live');
+  };
+  img.onerror = () => $camDot.classList.remove('live');
+  img.src = url;
+}
+
+async function toggleHwCam() {
+  try {
+    const r = await fetch('/config');
+    let cfg = await r.json();
+    cfg.vision = cfg.vision || {};
+    cfg.vision.enabled = !cfg.vision.enabled;
+    document.getElementById('btn-hw-cam').classList.toggle('active', cfg.vision.enabled);
+    await fetch('/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({vision: {enabled: cfg.vision.enabled}}) });
+    await fetch('/restart', { method: 'POST' });
+    logEvent('⟳ Camera toggled. Restarting brain…');
+  } catch(e) { console.error(e); }
+}
+
+async function toggleHwMic() {
+  try {
+    const r = await fetch('/config');
+    let cfg = await r.json();
+    cfg.audio = cfg.audio || {};
+    cfg.audio.input = cfg.audio.input || {};
+    cfg.audio.input.enabled = !cfg.audio.input.enabled;
+    document.getElementById('btn-hw-mic').classList.toggle('active', cfg.audio.input.enabled);
+    await fetch('/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({audio: {input: {enabled: cfg.audio.input.enabled}}}) });
+    await fetch('/restart', { method: 'POST' });
+    logEvent('⟳ Mic toggled. Restarting brain…');
+  } catch(e) { console.error(e); }
+}
+
+function toggleCam() {
+  camOn = !camOn;
+  $btnCam.classList.toggle('active', camOn);
+  if (camOn) {
+    _refreshSnapshot();
+    camPoller = setInterval(_refreshSnapshot, 200);  // ~5fps — smooth without lag
+  } else {
+    clearInterval(camPoller);
+    camPoller = null;
+    $camImg.src = '';
+    $camDot.classList.remove('live');
+  }
+  _syncPanel();
+}
+
+function toggleScene() {
+  sceneOn = !sceneOn;
+  $btnScene.classList.toggle('active', sceneOn);
+  if (sceneOn) {
+    fetchScene();
+    scenePoller = setInterval(fetchScene, 3000);
+  } else {
+    clearInterval(scenePoller);
+    scenePoller = null;
+  }
+  _syncPanel();
+}
+
+async function fetchScene() {
+  try {
+    const r = await fetch('/world');
+    if (!r.ok) return;
+    const d = await r.json();
+
+    // Scene description
+    const scene = d.scene || '';
+    $sceneText.textContent = scene || 'No scene data yet.';
+
+    // Entities
+    const entities = d.present_entities || [];
+    $sceneEntities.innerHTML = '';
+    entities.forEach(name => {
+      const tag = document.createElement('span');
+      tag.className = 'entity-tag';
+      tag.textContent = name;
+      $sceneEntities.appendChild(tag);
+    });
+
+    // Audio hint
+    if (d.audio) {
+      const audioEl = document.createElement('div');
+      audioEl.style.cssText = 'padding:0 10px 6px;font-size:10px;color:#5a7a99;font-style:italic';
+      audioEl.textContent = d.audio;
+      $sceneEntities.appendChild(audioEl);
+    }
+
+    // Gaze indicator
+    if (d.gaze_direct) {
+      $sceneAge.textContent = '👁 DIRECT GAZE';
+      $sceneAge.style.color = 'var(--accent)';
+    } else {
+      $sceneAge.textContent = scene ? '✓ LIVE' : '';
+      $sceneAge.style.color = '';
+    }
+
+    // Also log notable world events
+    if (entities.length > 0) {
+      logEvent(`👁 Present: ${entities.join(', ')}`);
+    }
+  } catch { /* ignore fetch errors */ }
+}
+
+// Wire world.update WebSocket events to scene panel too
+const _origOnMessage = null;
+// Extend existing ws.onmessage to handle world events
+function _handleWorldMsg(msg) {
+  if (!sceneOn) return;
+  if (msg.type === 'world.update' || msg.type === 'scene.change') {
+    fetchScene();
+  }
+  if (msg.type === 'person.enter') {
+    const name = msg.data?.entity || 'someone';
+    logEvent(`🚶 Entered: ${name}`);
+    if (sceneOn) fetchScene();
+  }
+  if (msg.type === 'person.leave') {
+    const name = msg.data?.entity || 'someone';
+    logEvent(`🚶 Left: ${name}`);
+    if (sceneOn) fetchScene();
+  }
+  if (msg.type === 'gaze.direct') {
+    logEvent('👁 Direct gaze');
+  }
+  if (msg.type === 'audio.event') {
+    logEvent(`🔊 ${msg.data?.description || 'sound'}`);
+  }
+}
+
+// ── Init ──
+showLoading();  // show loading.gif immediately
+connect();
+setInterval(fetchStatus, 30000);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Config Panel
+// ══════════════════════════════════════════════════════════════════════════════
+let _cfg = {};
+
+const PROVIDERS = [
+  { key: 'er_enabled',           label: 'Gemini ER',    icon: '🤖' },
+  { key: 'google_ai_enabled',    label: 'Google AI',    icon: '🌐' },
+  { key: 'ollama_enabled',       label: 'Ollama Local', icon: '🦙' },
+  { key: 'openrouter_enabled',   label: 'OpenRouter',   icon: '🔀' },
+  { key: 'ollama_cloud_enabled', label: 'Ollama Cloud', icon: '☁️'  },
+];
+
+async function openCfg() {
+  const overlay = document.getElementById('cfg-overlay');
+  overlay.classList.add('open');
+  setCfgStatus('Loading config…', '');
+  document.getElementById('cfg-save-btn').disabled = true;
+  try {
+    const r = await fetch('/config');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    _cfg = await r.json();
+    renderAllPanes();
+    setCfgStatus('', '');
+    document.getElementById('cfg-save-btn').disabled = false;
+  } catch (e) {
+    setCfgStatus(`Failed to load: ${e.message}`, 'err');
+  }
+}
+
+function closeCfg() {
+  document.getElementById('cfg-overlay').classList.remove('open');
+}
+
+function setCfgStatus(msg, cls) {
+  const el = document.getElementById('cfg-status');
+  el.textContent = msg;
+  el.className = cls;
+}
+
+function switchCfgTab(tab) {
+  document.querySelectorAll('.cfg-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.cfg-pane').forEach(p =>
+    p.classList.toggle('cfg-pane-hidden', p.id !== `cfg-pane-${tab}`));
+}
+
+function renderAllPanes() {
+  buildLLMPane();
+  buildBrainPane();
+  buildAudioPane();
+  buildVisionPane();
+  buildCognitionPane();
+}
+
+// ── DOM helpers ───────────────────────────────────────────────────────────────
+function _sec(title) {
+  const s = document.createElement('div');
+  s.className = 'cfg-section';
+  const t = document.createElement('div');
+  t.className = 'cfg-section-title';
+  t.textContent = title;
+  s.appendChild(t);
+  return s;
+}
+
+function _row(label, hint, ctrl) {
+  const row = document.createElement('div');
+  row.className = 'cfg-row';
+  const lbl = document.createElement('div');
+  lbl.className = 'cfg-label';
+  lbl.textContent = label;
+  if (hint) { const sm = document.createElement('small'); sm.textContent = hint; lbl.appendChild(sm); }
+  const c = document.createElement('div');
+  c.className = 'cfg-ctrl';
+  if (ctrl) c.appendChild(ctrl);
+  row.appendChild(lbl);
+  row.appendChild(c);
+  return row;
+}
+
+function _toggle(id, checked) {
+  const lbl = document.createElement('label');
+  lbl.className = 'cfg-toggle';
+  const inp = document.createElement('input');
+  inp.type = 'checkbox'; inp.id = id; inp.checked = !!checked;
+  const track = document.createElement('div');
+  track.className = 'cfg-toggle-track';
+  lbl.appendChild(inp); lbl.appendChild(track);
+  return lbl;
+}
+
+function _text(id, value, cls) {
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.className = `cfg-input${cls ? ' '+cls : ''}`;
+  inp.id = id; inp.value = value ?? '';
+  return inp;
+}
+
+function _num(id, value, cls) {
+  const inp = document.createElement('input');
+  inp.type = 'number'; inp.className = `cfg-input narrow${cls ? ' '+cls : ''}`;
+  inp.id = id; inp.value = value ?? '';
+  return inp;
+}
+
+function _sel(id, opts, value) {
+  const sel = document.createElement('select');
+  sel.className = 'cfg-select'; sel.id = id;
+  opts.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = typeof o === 'string' ? o : o.v;
+    opt.textContent = typeof o === 'string' ? o : o.l;
+    if (opt.value === String(value ?? '')) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  return sel;
+}
+
+function _range(id, value, min, max, step) {
+  const wrap = document.createElement('div');
+  wrap.className = 'cfg-range-wrap';
+  const inp = document.createElement('input');
+  inp.type = 'range'; inp.className = 'cfg-range';
+  inp.id = id; inp.min = min; inp.max = max; inp.step = step; inp.value = value ?? min;
+  const lbl = document.createElement('span');
+  lbl.className = 'cfg-range-val'; lbl.textContent = inp.value;
+  inp.addEventListener('input', () => lbl.textContent = parseFloat(inp.value).toFixed(step < 1 ? 2 : 0));
+  wrap.appendChild(inp); wrap.appendChild(lbl);
+  return wrap;
+}
+
+function _provFields(key, activeKey) {
+  const div = document.createElement('div');
+  div.className = 'cfg-provider-fields' + (key === activeKey ? ' visible' : '');
+  div.id = `cfg-pf-${key}`;
+  return div;
+}
+
+// ── LLM Pane ─────────────────────────────────────────────────────────────────
+function buildLLMPane() {
+  const pane = document.getElementById('cfg-pane-llm');
+  pane.innerHTML = '';
+  const llm = _cfg.llm || {};
+
+  // ── Primary Cloud (radio: ER | Google AI | None) ──
+  const primSec = _sec('Primary Cloud Provider');
+  const primVal = llm.er_enabled ? 'er' : llm.google_ai_enabled ? 'google_ai' : 'none';
+
+  const radioGroup = document.createElement('div');
+  radioGroup.className = 'cfg-radio-group';
+  [
+    { v: 'er',        label: 'Gemini ER',  hint: 'Robotics-ER SDK + reasoning' },
+    { v: 'google_ai', label: 'Google AI',  hint: 'Gemini REST API' },
+    { v: 'none',      label: 'None',       hint: 'Skip cloud primary' },
+  ].forEach(opt => {
+    const btn = document.createElement('div');
+    btn.className = 'cfg-radio-btn' + (primVal === opt.v ? ' selected' : '');
+    btn.dataset.val = opt.v;
+    btn.innerHTML = `<strong>${opt.label}</strong><small>${opt.hint}</small>`;
+    btn.addEventListener('click', () => {
+      radioGroup.querySelectorAll('.cfg-radio-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      const cloudRow = document.getElementById('cfg-cloud-model-row');
+      if (cloudRow) cloudRow.style.display = opt.v !== 'none' ? '' : 'none';
+    });
+    radioGroup.appendChild(btn);
+  });
+  primSec.appendChild(radioGroup);
+
+  // Cloud model field — shared by ER + Google AI
+  const cloudRow = _row('Cloud Model', 'e.g. gemini-robotics-er-1.6-preview, gemini-2.0-flash', _text('cfg_cloud_model', llm.cloud_model, 'wide'));
+  cloudRow.id = 'cfg-cloud-model-row';
+  cloudRow.style.display = primVal !== 'none' ? '' : 'none';
+  primSec.appendChild(cloudRow);
+  pane.appendChild(primSec);
+
+  // ── Fallback Providers (independent toggles, any combination) ──
+  const fbSec = _sec('Fallback Providers');
+  const note = document.createElement('div');
+  note.className = 'cfg-note';
+  note.textContent = 'Enabled fallbacks are tried in order: Ollama Local → Ollama Cloud → OpenRouter. Can combine with primary above.';
+  fbSec.appendChild(note);
+
+  _addFallbackBlock(fbSec, 'Ollama Local', 'cfg_ol_en', llm.ollama_enabled, [
+    _row('Host', 'e.g. http://localhost:11434', _text('cfg_ol_host', llm.ollama_host)),
+    _row('Model', 'e.g. gemma4, llama3.2', _text('cfg_ol_model', llm.default_model)),
+  ]);
+  _addFallbackBlock(fbSec, 'Ollama Cloud', 'cfg_oc_en', llm.ollama_cloud_enabled, [
+    _row('API Key', 'From ollama.com/settings/keys', _text('cfg_oc_key', llm.ollama_cloud_api_key, 'wide')),
+    _row('Model', 'e.g. qwen3-vl:235b, gpt-oss:120b', _text('cfg_oc_model', llm.ollama_cloud_model)),
+  ]);
+  _addFallbackBlock(fbSec, 'OpenRouter', 'cfg_or_en', llm.openrouter_enabled, [
+    _row('API Key', 'sk-or-v1-…', _text('cfg_or_key', llm.openrouter_api_key, 'wide')),
+    _row('Model', 'e.g. google/gemma-4-31b-it:free', _text('cfg_or_model', llm.openrouter_model)),
+  ]);
+  pane.appendChild(fbSec);
+
+  // ── Routing Thresholds ──
+  const rSec = _sec('Routing Thresholds');
+  rSec.appendChild(_row('Simple Token Threshold', 'Route to light model below this', _num('cfg_simple_thresh', llm.simple_token_threshold)));
+  rSec.appendChild(_row('Complex Token Threshold', 'Route to full model above this', _num('cfg_complex_thresh', llm.complex_token_threshold)));
+  rSec.appendChild(_row('Cache Similarity', 'Cosine threshold for cache hit', _range('cfg_cache_sim', llm.cache_similarity_threshold, 0, 1, 0.01)));
+  rSec.appendChild(_row('Max Retries', '', _num('cfg_max_retries', llm.max_retries)));
+  rSec.appendChild(_row('Timeout (s)', '', _num('cfg_timeout', llm.timeout_seconds)));
+  pane.appendChild(rSec);
+
+  // ── Model Features ──
+  const featSec = _sec('Model Features');
+  featSec.appendChild(_row('Enable Thinking', 'Stream model <think> reasoning tokens to the UI', _toggle('cfg_llm_thinking', llm.thinking_enabled)));
+  pane.appendChild(featSec);
+}
+
+function _addFallbackBlock(parent, label, toggleId, enabled, rows) {
+  const wrap = document.createElement('div');
+  wrap.className = 'cfg-fallback-block';
+  const hdr = document.createElement('div');
+  hdr.className = 'cfg-fallback-hdr';
+  const lbl = document.createElement('span');
+  lbl.className = 'cfg-fallback-label';
+  lbl.textContent = label;
+  const tog = _toggle(toggleId, enabled);
+  hdr.appendChild(lbl); hdr.appendChild(tog);
+  wrap.appendChild(hdr);
+  const sub = document.createElement('div');
+  sub.className = 'cfg-fallback-sub' + (enabled ? ' visible' : '');
+  rows.forEach(r => sub.appendChild(r));
+  wrap.appendChild(sub);
+  tog.querySelector('input').addEventListener('change', e => sub.classList.toggle('visible', e.target.checked));
+  parent.appendChild(wrap);
+}
+
+// ── Brain Pane ────────────────────────────────────────────────────────────────
+function buildBrainPane() {
+  const pane = document.getElementById('cfg-pane-brain');
+  pane.innerHTML = '';
+  const b = _cfg.brain || {};
+
+  const s = _sec('Core');
+  s.appendChild(_row('Name', 'Brain identity', _text('cfg_brain_name', b.name)));
+  s.appendChild(_row('Wake Word', 'Activation phrase', _text('cfg_brain_wake', b.wake_word)));
+  s.appendChild(_row('Language', 'ISO code', _text('cfg_brain_lang', b.language, 'narrow')));
+  s.appendChild(_row('Log Level', '', _sel('cfg_brain_log', ['DEBUG','INFO','WARNING','ERROR'], b.log_level)));
+  s.appendChild(_row('Idle Timeout (s)', 'Silence before IDLE', _num('cfg_brain_idle', b.idle_timeout_seconds)));
+  s.appendChild(_row('Thermal Throttle (°C)', 'Reduce inference above', _num('cfg_brain_thermal', b.thermal_throttle_temp)));
+  s.appendChild(_row('Pulse Hz', 'GWT heartbeat frequency', _num('cfg_brain_pulse', b.pulse_hz)));
+  pane.appendChild(s);
+
+  const d = _cfg.dream || {};
+  const ds = _sec('Dream');
+  ds.appendChild(_row('Enabled', 'Nightly memory consolidation', _toggle('cfg_dream_enabled', d.enabled)));
+  ds.appendChild(_row('Schedule', 'HH:MM daily run time', _text('cfg_dream_sched', d.schedule, 'narrow')));
+  ds.appendChild(_row('Min Episodes', 'Skip if fewer events today', _num('cfg_dream_min', d.min_episodes)));
+  pane.appendChild(ds);
+
+  const te = _cfg.task_executor || {}, sa = _cfg.synthesis_agent || {}, rr = _cfg.reflex_registry || {};
+  const ms = _sec('System Modules');
+  ms.appendChild(_row('Task Executor', 'Self-healing task runner', _toggle('cfg_task_exec', te.enabled)));
+  ms.appendChild(_row('Synthesis Agent', 'Neocortical self-repair', _toggle('cfg_synthesis', sa.enabled)));
+  ms.appendChild(_row('Reflex Registry', 'Semantic reflex cache', _toggle('cfg_reflex', rr.enabled)));
+  pane.appendChild(ms);
+}
+
+// ── Audio Pane ────────────────────────────────────────────────────────────────
+function buildAudioPane() {
+  const pane = document.getElementById('cfg-pane-audio');
+  pane.innerHTML = '';
+  const a = _cfg.audio || {}, out = a.output || {}, inp = a.input || {}, ww = a.wake_word || {};
+
+  const os = _sec('Output');
+  os.appendChild(_row('Enabled', 'Enable speaker output', _toggle('cfg_aud_out_en', out.enabled)));
+  os.appendChild(_row('Preferred Device', '', _sel('cfg_aud_pref', ['bluetooth','usb','aux'], out.preferred)));
+  os.appendChild(_row('Volume', '', _range('cfg_aud_vol', out.volume, 0, 100, 1)));
+
+  // TTS engine selector + conditional fields below it
+  const ttsSel = _sel('cfg_aud_tts', ['auto','kokoro','elevenlabs','edge','espeak'], out.tts_engine);
+  os.appendChild(_row('TTS Engine', '', ttsSel));
+
+  // ElevenLabs fields
+  const elvBlock = document.createElement('div');
+  elvBlock.appendChild(_row('Voice Name', 'ElevenLabs voice name', _text('cfg_elv_name', out.elevenlabs_voice_name)));
+  elvBlock.appendChild(_row('Voice ID', 'Skips API name lookup if set', _text('cfg_elv_id', out.elevenlabs_voice_id)));
+  os.appendChild(elvBlock);
+
+  // Edge-TTS field
+  const edgeBlock = document.createElement('div');
+  edgeBlock.appendChild(_row('Edge Voice', 'e.g. en-US-JennyNeural', _text('cfg_edge_voice', out.edge_voice)));
+  os.appendChild(edgeBlock);
+
+  // eSpeak fields
+  const espeakBlock = document.createElement('div');
+  espeakBlock.appendChild(_row('eSpeak Voice', 'e.g. en+f3', _text('cfg_espeak_voice', out.espeak_voice, 'narrow')));
+  espeakBlock.appendChild(_row('eSpeak Speed', 'Words per minute', _num('cfg_espeak_speed', out.espeak_speed)));
+  os.appendChild(espeakBlock);
+
+  function syncTTS(engine) {
+    elvBlock.style.display   = (engine === 'elevenlabs' || engine === 'auto') ? '' : 'none';
+    edgeBlock.style.display  = (engine === 'edge'       || engine === 'auto') ? '' : 'none';
+    espeakBlock.style.display= (engine === 'espeak') ? '' : 'none';
+  }
+  syncTTS(out.tts_engine || 'auto');
+  ttsSel.addEventListener('change', () => syncTTS(ttsSel.value));
+  pane.appendChild(os);
+
+  // Input
+  const is = _sec('Input');
+  is.appendChild(_row('Enabled', 'Enable microphone input', _toggle('cfg_aud_in_en', inp.enabled)));
+  is.appendChild(_row('Sample Rate (Hz)', '', _num('cfg_aud_sr', inp.sample_rate)));
+  is.appendChild(_row('VAD Threshold', '0 = sensitive, 1 = deaf', _range('cfg_aud_vad', inp.vad_threshold, 0, 1, 0.05)));
+  is.appendChild(_row('Silence Timeout (ms)', 'End-of-utterance detection', _num('cfg_aud_silence', inp.silence_timeout_ms)));
+  pane.appendChild(is);
+
+  // Wake Word — show details only when enabled
+  const ws2 = _sec('Wake Word');
+  const wwTog = _toggle('cfg_ww_enabled', ww.enabled);
+  ws2.appendChild(_row('Enabled', 'Enable wake word detection', wwTog));
+
+  const wwDetails = document.createElement('div');
+  wwDetails.style.display = ww.enabled ? '' : 'none';
+  wwDetails.appendChild(_row('Engine', '', _sel('cfg_ww_engine', ['openwakeword','vosk_text','none'], ww.engine)));
+  wwDetails.appendChild(_row('Model', 'openwakeword model name', _text('cfg_ww_model', ww.model)));
+  wwDetails.appendChild(_row('Threshold', 'Detection confidence', _range('cfg_ww_thresh', ww.threshold, 0, 1, 0.05)));
+  wwDetails.appendChild(_row('VAD Pre-filter', 'Skip if silence detected', _toggle('cfg_ww_vad', ww.vad_enabled)));
+  wwDetails.appendChild(_row('Fallback', 'Text-match fallback engine', _sel('cfg_ww_fallback', ['vosk_text','none'], ww.fallback)));
+  ws2.appendChild(wwDetails);
+  wwTog.querySelector('input').addEventListener('change', e => { wwDetails.style.display = e.target.checked ? '' : 'none'; });
+  pane.appendChild(ws2);
+}
+
+// ── Vision Pane ───────────────────────────────────────────────────────────────
+function buildVisionPane() {
+  const pane = document.getElementById('cfg-pane-vision');
+  pane.innerHTML = '';
+  const v = _cfg.vision || {}, m = _cfg.motor || {}, wd = _cfg.wheel_drive || {};
+
+  const vs = _sec('Vision');
+  vs.appendChild(_row('Enabled', 'Enable camera input', _toggle('cfg_vis_en', v.enabled)));
+  vs.appendChild(_row('Source', '', _sel('cfg_vis_src', ['auto','usb','csi'], v.source)));
+  vs.appendChild(_row('Capture Interval (ms)', '', _num('cfg_vis_cap', v.capture_interval_ms)));
+  vs.appendChild(_row('Detection Confidence', '', _range('cfg_vis_conf', v.detection_confidence, 0, 1, 0.05)));
+  vs.appendChild(_row('Scene Description', 'Generate text descriptions', _toggle('cfg_vis_scene', v.scene_description)));
+  vs.appendChild(_row('Background Scan', 'Periodic cloud scene analysis', _toggle('cfg_vis_scan', v.scan_enabled)));
+  vs.appendChild(_row('Scan Interval (s)', '', _num('cfg_vis_scan_int', v.scan_interval)));
+  pane.appendChild(vs);
+
+  const ms = _sec('Motor / Pan-Tilt');
+  ms.appendChild(_row('Enabled', 'Pan-tilt motor control', _toggle('cfg_motor_en', m.enabled)));
+  ms.appendChild(_row('Type', '', _sel('cfg_motor_type', ['pantilt','wheels','arm','none'], m.type)));
+  ms.appendChild(_row('Default Speed', 'PWM 0–100', _range('cfg_motor_spd', m.speed_default, 0, 100, 1)));
+  ms.appendChild(_row('Saccade Smoothing', 'Smooth sigmoid movement', _toggle('cfg_motor_sacc', m.saccade_smoothing)));
+  ms.appendChild(_row('Saccade Steps', '', _num('cfg_motor_steps', m.saccade_steps)));
+  pane.appendChild(ms);
+
+  const wds = _sec('Wheel Drive (L298N)');
+  wds.appendChild(_row('Enabled', 'Differential drive', _toggle('cfg_wd_en', wd.enabled)));
+  wds.appendChild(_row('Default Speed', 'PWM 0–100', _range('cfg_wd_spd', wd.speed_default, 0, 100, 1)));
+  wds.appendChild(_row('Rotate Speed', 'For precision turns', _range('cfg_wd_rot', wd.rotate_speed, 0, 100, 1)));
+  pane.appendChild(wds);
+}
+
+// ── Cognition Pane ────────────────────────────────────────────────────────────
+function buildCognitionPane() {
+  const pane = document.getElementById('cfg-pane-cognition');
+  pane.innerHTML = '';
+  const cx = _cfg.cognition_extensions || {};
+
+  const cs = _sec('Core Agents');
+  [
+    ['attention',            'Attention Agent',         'GWT Spotlight + salience gating'],
+    ['interoception',        'Interoception Agent',     'CPU/thermal/RAM self-monitoring'],
+    ['metacognition',        'Metacognition Agent',     'Confidence tracking + uncertainty flags'],
+    ['intrinsic_motivation', 'Intrinsic Motivation',    'Drive system (learn/help/explore/rest)'],
+    ['ideation',             'Ideation / Curiosity',    'Curiosity-driven idea generation'],
+    ['imagination',          'Imagination Agent',       'Consequence prediction before acting'],
+  ].forEach(([k, label, hint]) => {
+    cs.appendChild(_row(label, hint, _toggle(`cfg_cx_${k}`, (cx[k]||{}).enabled)));
+  });
+  pane.appendChild(cs);
+
+  const v51s = _sec('v5.1 Enhancements');
+  [
+    ['brain_fog',         'Brain Fog',           'Suppress heavy agents during ECO/overwhelm'],
+    ['internal_monologue','Internal Monologue',   'Private think-pass before responding'],
+    ['affective_bias',    'Affective Bias',       'Emotion-aware salience + response style'],
+    ['emotional_pregate', 'Emotional Pre-gate',   'Skip low-importance perception episodes'],
+  ].forEach(([k, label, hint]) => {
+    v51s.appendChild(_row(label, hint, _toggle(`cfg_cx_${k}`, (cx[k]||{}).enabled)));
+  });
+  pane.appendChild(v51s);
+
+  const np = cx.neuroplasticity || {};
+  const nps = _sec('Neuroplasticity');
+  nps.appendChild(_row('Correction Detection',   'Learn from "that\'s wrong" feedback', _toggle('cfg_np_corr', np.correction_detection)));
+  nps.appendChild(_row('Scenario Preferences',   'Time-contextual preference learning', _toggle('cfg_np_scen', np.scenario_preferences)));
+  nps.appendChild(_row('Predicted Needs',        'Inject predictions into system prompt', _toggle('cfg_np_pred', np.predicted_needs)));
+  nps.appendChild(_row('Persist Knowledge Gaps', 'Save gaps across restarts',             _toggle('cfg_np_gaps', np.persist_knowledge_gaps)));
+  pane.appendChild(nps);
+
+  const att = cx.attention || {};
+  const ats = _sec('Attention Thresholds');
+  ats.appendChild(_row('Salience Threshold', 'Below this → message discarded',     _range('cfg_att_sal',  att.salience_threshold, 0, 1, 0.05)));
+  ats.appendChild(_row('Shift Threshold',    'Above this → ATTENTION_SHIFT event', _range('cfg_att_shift',att.shift_threshold, 0, 1, 0.05)));
+  ats.appendChild(_row('Spotlight Size',     'Top-N salient messages to LLM',      _num('cfg_att_spot', att.spotlight_size)));
+  pane.appendChild(ats);
+
+  const im2 = cx.internal_monologue || {};
+  const ims = _sec('Internal Monologue Tuning');
+  ims.appendChild(_row('Think Tokens',       'Token budget for private think pass', _num('cfg_im_tokens',  im2.think_tokens)));
+  ims.appendChild(_row('Min Response Tokens','Skip monologue below this budget',    _num('cfg_im_minresp', im2.min_response_tokens)));
+  pane.appendChild(ims);
+
+  const drives = (cx.intrinsic_motivation || {}).drives || {};
+  const drs = _sec('Drive Weights');
+  ['learn','help','explore','rest'].forEach(d => {
+    drs.appendChild(_row(d[0].toUpperCase()+d.slice(1), '', _range(`cfg_drive_${d}`, drives[d], 0, 1, 0.05)));
+  });
+  pane.appendChild(drs);
+}
+
+// ── Collect & save ────────────────────────────────────────────────────────────
+function _v(id) {
+  const el = document.getElementById(id);
+  if (!el) return undefined;
+  if (el.type === 'checkbox') return el.checked;
+  if (el.type === 'number')   { const n = parseFloat(el.value); return isNaN(n) ? undefined : n; }
+  if (el.type === 'range')    return parseFloat(el.value);
+  return el.value === '' ? undefined : el.value;
+}
+
+function _activeProvider() {
+  const btn = document.querySelector('#cfg-pane-llm .cfg-provider-btn.selected');
+  return btn ? btn.dataset.key : null;
+}
+
+function collectCfgValues() {
+  const p = JSON.parse(JSON.stringify(_cfg)); // start from current loaded config
+  const V = _v;
+
+  // LLM — primary cloud (radio)
+  const primBtn = document.querySelector('#cfg-pane-llm .cfg-radio-btn.selected');
+  if (primBtn && p.llm) {
+    const pv = primBtn.dataset.val;
+    p.llm.er_enabled        = pv === 'er';
+    p.llm.google_ai_enabled = pv === 'google_ai';
+    if (V('cfg_cloud_model') !== undefined) p.llm.cloud_model = V('cfg_cloud_model');
+  }
+  // LLM — fallback providers (independent toggles)
+  if (V('cfg_ol_en')  !== undefined) p.llm.ollama_enabled       = V('cfg_ol_en');
+  if (V('cfg_oc_en')  !== undefined) p.llm.ollama_cloud_enabled = V('cfg_oc_en');
+  if (V('cfg_or_en')  !== undefined) p.llm.openrouter_enabled   = V('cfg_or_en');
+  if (V('cfg_ol_host')  !== undefined) p.llm.ollama_host            = V('cfg_ol_host');
+  if (V('cfg_ol_model') !== undefined) p.llm.default_model          = V('cfg_ol_model');
+  if (V('cfg_oc_key')   !== undefined) p.llm.ollama_cloud_api_key   = V('cfg_oc_key');
+  if (V('cfg_oc_model') !== undefined) p.llm.ollama_cloud_model     = V('cfg_oc_model');
+  if (V('cfg_or_key')   !== undefined) p.llm.openrouter_api_key     = V('cfg_or_key');
+  if (V('cfg_or_model') !== undefined) p.llm.openrouter_model       = V('cfg_or_model');
+  if (V('cfg_simple_thresh')  !== undefined) p.llm.simple_token_threshold     = V('cfg_simple_thresh');
+  if (V('cfg_complex_thresh') !== undefined) p.llm.complex_token_threshold    = V('cfg_complex_thresh');
+  if (V('cfg_cache_sim')      !== undefined) p.llm.cache_similarity_threshold = V('cfg_cache_sim');
+  if (V('cfg_max_retries')    !== undefined) p.llm.max_retries                = V('cfg_max_retries');
+  if (V('cfg_timeout')        !== undefined) p.llm.timeout_seconds            = V('cfg_timeout');
+  if (V('cfg_llm_thinking')   !== undefined) p.llm.thinking_enabled           = V('cfg_llm_thinking');
+
+  // Brain
+  const B = p.brain = p.brain || {};
+  if (V('cfg_brain_name')    !== undefined) B.name                   = V('cfg_brain_name');
+  if (V('cfg_brain_wake')    !== undefined) B.wake_word              = V('cfg_brain_wake');
+  if (V('cfg_brain_lang')    !== undefined) B.language               = V('cfg_brain_lang');
+  if (V('cfg_brain_log')     !== undefined) B.log_level              = V('cfg_brain_log');
+  if (V('cfg_brain_idle')    !== undefined) B.idle_timeout_seconds   = V('cfg_brain_idle');
+  if (V('cfg_brain_thermal') !== undefined) B.thermal_throttle_temp  = V('cfg_brain_thermal');
+  if (V('cfg_brain_pulse')   !== undefined) B.pulse_hz               = V('cfg_brain_pulse');
+
+  const D = p.dream = p.dream || {};
+  if (V('cfg_dream_enabled') !== undefined) D.enabled      = V('cfg_dream_enabled');
+  if (V('cfg_dream_sched')   !== undefined) D.schedule     = V('cfg_dream_sched');
+  if (V('cfg_dream_min')     !== undefined) D.min_episodes = V('cfg_dream_min');
+
+  if (V('cfg_task_exec')  !== undefined) (p.task_executor   = p.task_executor   || {}).enabled = V('cfg_task_exec');
+  if (V('cfg_synthesis')  !== undefined) (p.synthesis_agent = p.synthesis_agent || {}).enabled = V('cfg_synthesis');
+  if (V('cfg_reflex')     !== undefined) (p.reflex_registry = p.reflex_registry || {}).enabled = V('cfg_reflex');
+
+  // Audio
+  const A = p.audio = p.audio || {}, O = A.output = A.output || {}, I = A.input = A.input || {}, W = A.wake_word = A.wake_word || {};
+  if (V('cfg_aud_out_en')   !== undefined) O.enabled                = V('cfg_aud_out_en');
+  if (V('cfg_aud_pref')     !== undefined) O.preferred              = V('cfg_aud_pref');
+  if (V('cfg_aud_vol')      !== undefined) O.volume                 = V('cfg_aud_vol');
+  if (V('cfg_aud_tts')      !== undefined) O.tts_engine             = V('cfg_aud_tts');
+  if (V('cfg_elv_name')     !== undefined) O.elevenlabs_voice_name  = V('cfg_elv_name');
+  if (V('cfg_elv_id')       !== undefined) O.elevenlabs_voice_id    = V('cfg_elv_id');
+  if (V('cfg_edge_voice')   !== undefined) O.edge_voice             = V('cfg_edge_voice');
+  if (V('cfg_espeak_voice') !== undefined) O.espeak_voice           = V('cfg_espeak_voice');
+  if (V('cfg_espeak_speed') !== undefined) O.espeak_speed           = V('cfg_espeak_speed');
+  if (V('cfg_aud_in_en')    !== undefined) I.enabled                = V('cfg_aud_in_en');
+  if (V('cfg_aud_sr')       !== undefined) I.sample_rate            = V('cfg_aud_sr');
+  if (V('cfg_aud_vad')      !== undefined) I.vad_threshold          = V('cfg_aud_vad');
+  if (V('cfg_aud_silence')  !== undefined) I.silence_timeout_ms     = V('cfg_aud_silence');
+  if (V('cfg_ww_enabled')   !== undefined) W.enabled                = V('cfg_ww_enabled');
+  if (V('cfg_ww_engine')    !== undefined) W.engine                 = V('cfg_ww_engine');
+  if (V('cfg_ww_model')     !== undefined) W.model                  = V('cfg_ww_model');
+  if (V('cfg_ww_thresh')    !== undefined) W.threshold              = V('cfg_ww_thresh');
+  if (V('cfg_ww_vad')       !== undefined) W.vad_enabled            = V('cfg_ww_vad');
+  if (V('cfg_ww_fallback')  !== undefined) W.fallback               = V('cfg_ww_fallback');
+
+  // Vision
+  const Vi = p.vision = p.vision || {};
+  if (V('cfg_vis_en')       !== undefined) Vi.enabled              = V('cfg_vis_en');
+  if (V('cfg_vis_src')      !== undefined) Vi.source               = V('cfg_vis_src');
+  if (V('cfg_vis_cap')      !== undefined) Vi.capture_interval_ms  = V('cfg_vis_cap');
+  if (V('cfg_vis_conf')     !== undefined) Vi.detection_confidence = V('cfg_vis_conf');
+  if (V('cfg_vis_scene')    !== undefined) Vi.scene_description    = V('cfg_vis_scene');
+  if (V('cfg_vis_scan')     !== undefined) Vi.scan_enabled         = V('cfg_vis_scan');
+  if (V('cfg_vis_scan_int') !== undefined) Vi.scan_interval        = V('cfg_vis_scan_int');
+
+  const M = p.motor = p.motor || {};
+  if (V('cfg_motor_en')   !== undefined) M.enabled           = V('cfg_motor_en');
+  if (V('cfg_motor_type') !== undefined) M.type              = V('cfg_motor_type');
+  if (V('cfg_motor_spd')  !== undefined) M.speed_default     = V('cfg_motor_spd');
+  if (V('cfg_motor_sacc') !== undefined) M.saccade_smoothing = V('cfg_motor_sacc');
+  if (V('cfg_motor_steps')!== undefined) M.saccade_steps     = V('cfg_motor_steps');
+
+  const WD = p.wheel_drive = p.wheel_drive || {};
+  if (V('cfg_wd_en')  !== undefined) WD.enabled       = V('cfg_wd_en');
+  if (V('cfg_wd_spd') !== undefined) WD.speed_default = V('cfg_wd_spd');
+  if (V('cfg_wd_rot') !== undefined) WD.rotate_speed  = V('cfg_wd_rot');
+
+  // Cognition extensions
+  const CX = p.cognition_extensions = p.cognition_extensions || {};
+  ['attention','interoception','metacognition','intrinsic_motivation','ideation','imagination',
+   'brain_fog','internal_monologue','affective_bias','emotional_pregate'].forEach(k => {
+    if (V(`cfg_cx_${k}`) !== undefined) (CX[k] = CX[k] || {}).enabled = V(`cfg_cx_${k}`);
+  });
+  const NP = CX.neuroplasticity = CX.neuroplasticity || {};
+  if (V('cfg_np_corr') !== undefined) NP.correction_detection    = V('cfg_np_corr');
+  if (V('cfg_np_scen') !== undefined) NP.scenario_preferences    = V('cfg_np_scen');
+  if (V('cfg_np_pred') !== undefined) NP.predicted_needs         = V('cfg_np_pred');
+  if (V('cfg_np_gaps') !== undefined) NP.persist_knowledge_gaps  = V('cfg_np_gaps');
+  if (V('cfg_att_sal')  !== undefined) (CX.attention = CX.attention || {}).salience_threshold = V('cfg_att_sal');
+  if (V('cfg_att_shift')!== undefined) (CX.attention = CX.attention || {}).shift_threshold    = V('cfg_att_shift');
+  if (V('cfg_att_spot') !== undefined) (CX.attention = CX.attention || {}).spotlight_size     = V('cfg_att_spot');
+  const IM = CX.internal_monologue = CX.internal_monologue || {};
+  if (V('cfg_im_tokens')  !== undefined) IM.think_tokens          = V('cfg_im_tokens');
+  if (V('cfg_im_minresp') !== undefined) IM.min_response_tokens   = V('cfg_im_minresp');
+  const IMD = (CX.intrinsic_motivation = CX.intrinsic_motivation || {});
+  IMD.drives = IMD.drives || {};
+  ['learn','help','explore','rest'].forEach(d => {
+    if (V(`cfg_drive_${d}`) !== undefined) IMD.drives[d] = V(`cfg_drive_${d}`);
+  });
+
+  return p;
+}
+
+async function saveCfg() {
+  const btn = document.getElementById('cfg-save-btn');
+  btn.disabled = true;
+  setCfgStatus('Saving…', '');
+  try {
+    const r = await fetch('/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(collectCfgValues()),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+    setCfgStatus('✓ Saved — restart brain to apply', 'ok');
+    logEvent('⚙ Config saved');
+  } catch (e) {
+    setCfgStatus(`✗ ${e.message}`, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function saveAndRestartCfg() {
+  const btn = document.getElementById('cfg-restart-btn');
+  btn.disabled = true;
+  setCfgStatus('Saving…', '');
+  try {
+    const r = await fetch('/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(collectCfgValues()),
+    });
+    if (!r.ok) throw new Error(`Save failed: HTTP ${r.status}`);
+    setCfgStatus('Restarting brain…', '');
+    await fetch('/restart', { method: 'POST' });
+    setCfgStatus('✓ Restarting — reconnecting…', 'ok');
+    logEvent('⟳ Brain restarting…');
+    // WebSocket will auto-reconnect via existing reconnect logic
+    setTimeout(closeCfg, 1500);
+  } catch (e) {
+    setCfgStatus(`✗ ${e.message}`, 'err');
+    btn.disabled = false;
+  }
+}
+
+// Wire up config panel events
+document.getElementById('cfg-close').addEventListener('click', closeCfg);
+document.getElementById('cfg-cancel').addEventListener('click', closeCfg);
+document.getElementById('cfg-save-btn').addEventListener('click', saveCfg);
+document.getElementById('cfg-restart-btn').addEventListener('click', saveAndRestartCfg);
+document.querySelectorAll('.cfg-tab').forEach(tab =>
+  tab.addEventListener('click', () => switchCfgTab(tab.dataset.tab)));
+document.getElementById('cfg-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('cfg-overlay')) closeCfg();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('cfg-overlay').classList.contains('open')) {
+    e.stopPropagation(); closeCfg();
+  }
+});
+
+// Auto-open config panel on page load if thinking is enabled in config
+(async () => {
+  try {
+    const r = await fetch('/config');
+    if (r.ok) {
+      const cfg = await r.json();
+      if (cfg.vision && cfg.vision.enabled) document.getElementById('btn-hw-cam').classList.add('active');
+      if (cfg.audio && cfg.audio.input && cfg.audio.input.enabled) document.getElementById('btn-hw-mic').classList.add('active');
+      if (cfg.llm && cfg.llm.thinking_enabled) {
+        await openCfg();
+        switchCfgTab('llm');
+      }
+    }
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+# Models (important)
+assets/models/
+
+data/chroma/
+data/faces/
+data/gallery/
+
+# Binaries
+bin/
+*.exe
+*.out
+
+# Logs
+*.log
+
+# Env files
+.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Go
+*.test
+vendor/
+
+
+#pyc files
+__pycache__/
+*.pyc
+/assets/models/
+/brain/agents/__pycache__/
+/api/__pycache__/
+/brain/__pycache__/
+/brain/nodes/__pycache__/
+/brain/memory/__pycache__/
+
+.claude/settings.local.json
+.venv/
+brain/hardware/__pycache__/
+brain/memory/__pycache__/*.pyc
